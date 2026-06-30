@@ -94,7 +94,10 @@ input[type=file]{display:none}
 .alert-row{border-radius:8px;padding:9px 14px;font-size:12px;font-weight:500;display:flex;align-items:flex-start;gap:10px;margin-bottom:6px;line-height:1.5}
 .alert-red{background:#2a1515;border:1px solid #5a2020;color:#fca5a5}
 .alert-amber{background:#2a2010;border:1px solid #5a3a10;color:#fcd34d}
+.alert-gray{background:#1a1c22;border:1px solid #2a2d3a;color:#9ca3af}
 .alert-green{background:#152a15;border:1px solid #205a20;color:#86efac}
+.alert-separator{font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#4b5563;padding:6px 4px 2px;margin-top:4px}
+.alert-separator:first-child{margin-top:0}
 .alert-icon{flex-shrink:0;margin-top:1px}
 
 /* Clubs table */
@@ -171,7 +174,7 @@ input[type=file]{display:none}
   <div class="upload-zone" id="drop-zone" onclick="document.getElementById('csv-input').click()">
     <div class="upload-icon">📂</div>
     <h2>Завантажте CSV файли з Redash</h2>
-    <p>Можна перетягнути всі файли одразу — за 1, 2, 3 або 4 тижні (до 28 файлів)<br>
+    <p>Можна перетягнути всі файли одразу — скільки завгодно тижнів<br>
     Система сама розпізнає тип звіту і тиждень, об'єднає однакові типи разом і побудує тренд</p>
     <input type="file" id="csv-input" multiple accept=".csv" onchange="handleFiles(this.files)">
   </div>
@@ -182,8 +185,8 @@ input[type=file]{display:none}
     <div class="file-item" id="fi-ugc"><div class="file-dot missing" id="fd-ugc"></div><span class="file-name">Weekly_UGC_Comments_Chats_Threads_Blogs</span><span class="file-status missing" id="fs-ugc">очікується</span></div>
     <div class="file-item" id="fi-subs"><div class="file-dot missing" id="fd-subs"></div><span class="file-name">Weekly_Social_subscriptions</span><span class="file-status missing" id="fs-subs">очікується</span></div>
     <div class="file-item" id="fi-reactions"><div class="file-dot missing" id="fd-reactions"></div><span class="file-name">Weekly_Social_Reactions</span><span class="file-status missing" id="fs-reactions">очікується</span></div>
-    <div class="file-item" id="fi-funnel-new"><div class="file-dot missing" id="fd-funnel-new"></div><span class="file-name">Weekly_Activation_Funnel_New_users</span><span class="file-status missing" id="fs-funnel-new">очікується</span></div>
-    <div class="file-item" id="fi-funnel-wau"><div class="file-dot missing" id="fd-funnel-wau"></div><span class="file-name">Weekly_Activation_Funnel_Active_Users_WAU</span><span class="file-status missing" id="fs-funnel-wau">очікується</span></div>
+    <div class="file-item" id="fi-funnel-new"><div class="file-dot missing" id="fd-funnel-new"></div><span class="file-name">Weekly_Engagement_Depth_New_users</span><span class="file-status missing" id="fs-funnel-new">очікується</span></div>
+    <div class="file-item" id="fi-funnel-wau"><div class="file-dot missing" id="fd-funnel-wau"></div><span class="file-name">Weekly_Engagement_Depth_Active_Users_(WAU)</span><span class="file-status missing" id="fs-funnel-wau">очікується</span></div>
   </div>
 
   <button class="generate-btn" id="gen-btn" disabled onclick="buildReport()">Генерувати звіт →</button>
@@ -237,17 +240,19 @@ function colorClass(v){ const num=parseFloat(v)||0; if(num>0) return 'up'; if(nu
 function arrow(v){ const num=parseFloat(v)||0; if(num>0) return '↑'; if(num<0) return '↓'; return '→'; }
 
 // Tiny inline SVG sparkline for a 2-3 point trend. values: array of numbers (nulls allowed), oldest→newest.
-function sparkline(values, color='#9ca3af', width=64, height=20){
+// labels: optional array of week strings (same length as values) for tooltip
+function sparkline(values, color='#9ca3af', width=64, height=20, labels=[]){
   const clean = values.filter(v=>v!=null);
   if(clean.length<2) return '';
   const min = Math.min(...clean), max = Math.max(...clean);
   const range = max-min || 1;
   const stepX = width/(values.length-1);
+  const fmtVal = v => v>=1000 ? (v/1000).toFixed(1)+'K' : v%1!=0 ? v.toFixed(1) : String(v);
   const pts = values.map((v,i)=>{
     if(v==null) return null;
     const x = i*stepX;
     const y = height - ((v-min)/range)*height;
-    return [x,y];
+    return [x, y, v, labels[i]||''];
   });
   let path='';
   let started=false;
@@ -256,19 +261,22 @@ function sparkline(values, color='#9ca3af', width=64, height=20){
     path += (started?' L ':'M ')+p[0].toFixed(1)+' '+p[1].toFixed(1);
     started=true;
   });
-  const dots = pts.filter(Boolean).map(p=>`<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="2" fill="${color}"/>`).join('');
+  const dots = pts.filter(Boolean).map(p=>{
+    const tip = p[3] ? `${p[3]}: ${fmtVal(p[2])}` : fmtVal(p[2]);
+    return `<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="3" fill="${color}" style="cursor:default"><title>${tip}</title></circle>`;
+  }).join('');
   return `<svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" style="overflow:visible"><path d="${path}" fill="none" stroke="${color}" stroke-width="1.5"/>${dots}</svg>`;
 }
 
 // ── File detection ───────────────────────────────────────
 const FILE_MAP = {
-  'engagement': /engagement|MAU_WAU_DAU/i,
+  'engagement': /MAU_WAU_DAU|Engagement_MAU/i,
   'retention':  /retention|D1_D7/i,
   'ugc':        /UGC|Comments_Chats/i,
   'subs':       /Social_sub/i,
   'reactions':  /Social_React/i,
-  'funnel-new': /Funnel_New/i,
-  'funnel-wau': /Funnel_Active|WAU/i
+  'funnel-new': /Funnel_New|Engagement_Depth_New/i,
+  'funnel-wau': /Funnel_Active|Engagement_Depth_Active/i
 };
 
 const loaded = {};
@@ -350,15 +358,15 @@ function uniqueWeeks(rows){
   return weeks.sort(); // ISO dates sort correctly as strings
 }
 
-// Returns up to 4 most recent weeks, oldest→newest, e.g. [w1,w2,w3,w4] where w4 is current
-function lastWeeks(rows, count=4){
+// Returns up to 5 most recent weeks, oldest→newest, e.g. [w1,w2,w3,w4,w5] where w5 is current
+function lastWeeks(rows, count){
   const weeks = uniqueWeeks(rows);
-  return weeks.slice(-count);
+  return count!=null ? weeks.slice(-count) : weeks;
 }
 
 // Build a {weekStr: row} map for a given dimension/app filter across all weeks present
 function weekSeries(rows, dimField, dimValue, appField='app_name', appValue=''){
-  const weeks = lastWeeks(rows, 4);
+  const weeks = lastWeeks(rows);
   const series = {};
   weeks.forEach(w=>{
     const row = rows.find(r=>r.week_str===w && r[dimField]===dimValue && r[appField]===appValue);
@@ -416,6 +424,21 @@ function streak(values){
   }
   return { direction: dir, weeksInARow: count }; // weeksInARow = how many consecutive moves, so count+1 = total weeks involved
 }
+function streakDelta(values, s){
+  const pts = values.filter(v=>v!=null).slice(-(s.weeksInARow+1));
+  if(pts.length<2) return null;
+  return pts[pts.length-1]-pts[0];
+}
+function streakRelPct(values, s){
+  const pts = values.filter(v=>v!=null).slice(-(s.weeksInARow+1));
+  if(pts.length<2 || !pts[0]) return null;
+  return (pts[pts.length-1]-pts[0])/Math.abs(pts[0])*100;
+}
+function fullRelPct(values){
+  const pts = values.filter(v=>v!=null);
+  if(pts.length<2 || !pts[0]) return null;
+  return (pts[pts.length-1]-pts[0])/Math.abs(pts[0])*100;
+}
 
 // ── Deep Analysis ────────────────────────────────────────
 function generateDeepAnalysis(D){
@@ -430,7 +453,7 @@ function generateDeepAnalysis(D){
       const recoveryPct = Math.abs((w3-w2)/Math.max(w2,1)*100);
       if(crashPct < -25 && recoveryPct < 10){
         items.push({color:'#f87171', title:'Чати: обвал без відновлення',
-          body:`Chatters у Clubs впали з ${fmtBig(w1)} до ${fmtBig(w2)} (${pct(crashPct)}) і залишаються на рівні ${fmtBig(w3)} — відновлення немає вже 2 тижні. Це не WoW-коливання, а стійка структурна зміна. Можлива причина: продуктова зміна або баг саме в чатах, а не загальне падіння залученості.`});
+          body:`Chatters у Clubs впали з ${fmtBig(w1)} до ${fmtBig(w2)} (${pct(crashPct)}) і залишаються на рівні ${fmtBig(w3)} — відновлення немає вже 2 тижні. Можливі причини: спад спортивних подій (сезонність), продуктова зміна або баг саме в чатах. Варто звірити з календарем матчів.`});
       }
     }
   }
@@ -489,17 +512,7 @@ function generateDeepAnalysis(D){
     }
   }
 
-  // 6. Onboarding channel dependency
-  if(D.subs && D.subs.clubs){
-    const c = D.subs.clubs;
-    const total = n(c.follows_total);
-    const onb = n(c.follows_onboarding);
-    const share = total>0 ? onb/total*100 : 0;
-    if(share > 78){
-      items.push({color:'#fbbf24', title:'Підписки: критична залежність від Onboarding',
-        body:`${share.toFixed(0)}% follows у Clubs приходять з onboarding (${fmtBig(onb)} з ${fmtBig(total)}). Органічні канали — пошук, публікації, блог — генерують лише ${(100-share).toFixed(1)}%. Якщо onboarding-флоу зміниться або UAC знизиться, підписки впадуть пропорційно.`});
-    }
-  }
+
 
   return items;
 }
@@ -510,12 +523,12 @@ function analyzeAll(){
 
   // Helper: get row where dimension=dim and app_name='' (group totals), for the LATEST week only
   function topRow(rows, dimField='dimension'){
-    const weeks = lastWeeks(rows,3);
+    const weeks = lastWeeks(rows);
     const currentWeek = weeks[weeks.length-1];
     return (dim)=> rows.filter(r=>r[dimField]===dim && r['app_name']==='' && r.week_str===currentWeek);
   }
   function appRows(rows, dim){
-    const weeks = lastWeeks(rows,3);
+    const weeks = lastWeeks(rows);
     const currentWeek = weeks[weeks.length-1];
     return rows.filter(r=>r['dimension']===dim && r['app_name']!=='' && r.week_str===currentWeek);
   }
@@ -524,7 +537,7 @@ function analyzeAll(){
   if(loaded.engagement){
     const rows = loaded.engagement;
     const top = topRow(rows);
-    const weeks = lastWeeks(rows,3);
+    const weeks = lastWeeks(rows);
     D.eng = {
       clubs:   top('Clubs')[0]   || {},
       flagman: top('Flagman')[0] || {},
@@ -539,6 +552,7 @@ function analyzeAll(){
         flagman_wau: metricTrend(weekSeries(rows,'dimension','Flagman'), 'wau'),
         web_wau: metricTrend(weekSeries(rows,'dimension','Web'), 'wau'),
         clubs_sessions: metricTrend(weekSeries(rows,'dimension','Clubs'), 'sessions'),
+        web_sessions: metricTrend(weekSeries(rows,'dimension','Web'), 'sessions'),
       }
     };
   }
@@ -546,7 +560,7 @@ function analyzeAll(){
   // ── RETENTION ──
   if(loaded.retention){
     const rows = loaded.retention;
-    const weeks = lastWeeks(rows,3);
+    const weeks = lastWeeks(rows);
     const currentWeek = weeks[weeks.length-1];
     function retTop(grp){ return rows.filter(r=>r['grp']===grp && r['app_name']==='' && r.week_str===currentWeek)[0]||{}; }
     function retApps(grp){ return rows.filter(r=>r['grp']===grp && r['app_name']!=='' && r.week_str===currentWeek); }
@@ -561,6 +575,8 @@ function analyzeAll(){
         clubs_d1: metricTrend(weekSeries(rows,'grp','Clubs'), 'd1_pct'),
         clubs_d7: metricTrend(weekSeries(rows,'grp','Clubs'), 'd7_pct'),
         flagman_retention: metricTrend(weekSeries(rows,'grp','Flagman'), 'retention_pct'),
+        web_retention: metricTrend(weekSeries(rows,'grp','Web'), 'retention_pct'),
+        web_d1: metricTrend(weekSeries(rows,'grp','Web'), 'd1_pct'),
       }
     };
   }
@@ -571,12 +587,20 @@ function analyzeAll(){
     const top = topRow(rows);
     D.ugc = {
       clubs: top('Clubs')[0]||{}, flagman: top('Flagman')[0]||{}, web: top('Web')[0]||{}, clubApps: appRows(rows,'Clubs'),
-      trends: {
-        clubs_chatters: metricTrend(weekSeries(rows,'dimension','Clubs'), 'chatters'),
-        clubs_comments: metricTrend(weekSeries(rows,'dimension','Clubs'), 'total_comments'),
-        flagman_chatters: metricTrend(weekSeries(rows,'dimension','Flagman'), 'chatters'),
-        flagman_threads: metricTrend(weekSeries(rows,'dimension','Flagman'), 'threads_created'),
-      }
+      weeks: lastWeeks(rows),
+      trends: (()=>{
+        const t={};
+        [['Clubs','clubs'],['Flagman','flagman'],['Web','web']].forEach(([Dim,dim])=>{
+          const ws = weekSeries(rows,'dimension',Dim);
+          [['commentators','commentators'],['total_comments','comments'],['chatters','chatters'],
+           ['total_chat_messages','chat_messages'],['blog_authors','blog_authors'],
+           ['blogs_created','blogs_created'],['thread_authors','thread_authors'],
+           ['threads_created','threads']].forEach(([field,key])=>{
+            t[dim+'_'+key]=metricTrend(ws,field);
+          });
+        });
+        return t;
+      })()
     };
   }
 
@@ -591,6 +615,8 @@ function analyzeAll(){
         clubs_unfollows: metricTrend(weekSeries(rows,'dimension','Clubs'), 'unfollows_total'),
         clubs_net: metricTrend(weekSeries(rows,'dimension','Clubs'), 'net_growth'),
         flagman_follows: metricTrend(weekSeries(rows,'dimension','Flagman'), 'follows_total'),
+        web_follows: metricTrend(weekSeries(rows,'dimension','Web'), 'follows_total'),
+        web_net: metricTrend(weekSeries(rows,'dimension','Web'), 'net_growth'),
       }
     };
   }
@@ -599,25 +625,31 @@ function analyzeAll(){
   if(loaded.reactions){
     const rows = loaded.reactions;
     const top = topRow(rows);
-    const reactWeeks = lastWeeks(rows, 4);
-    const _clubPollMap = {}, _flagPollMap = {};
+    const reactWeeks = lastWeeks(rows);
+    const _clubPollMap = {}, _flagPollMap = {}, _webPollMap = {};
     rows.forEach(r=>{
       if(r.app_name==='') return;
       if(r.dimension==='Clubs'){ if(!_clubPollMap[r.app_name]) _clubPollMap[r.app_name]={}; _clubPollMap[r.app_name][r.week_str]=n(r.poll_votes); }
       if(r.dimension==='Flagman'){ if(!_flagPollMap[r.app_name]) _flagPollMap[r.app_name]={}; _flagPollMap[r.app_name][r.week_str]=n(r.poll_votes); }
+      if(r.dimension==='Web'){ if(!_webPollMap[r.app_name]) _webPollMap[r.app_name]={}; _webPollMap[r.app_name][r.week_str]=n(r.poll_votes); }
     });
-    const clubPollTrends={}, flagPollTrends={};
+    const clubPollTrends={}, flagPollTrends={}, webPollTrends={};
     Object.keys(_clubPollMap).forEach(name=>{ clubPollTrends[name]=reactWeeks.map(w=>_clubPollMap[name][w]||0); });
     Object.keys(_flagPollMap).forEach(name=>{ flagPollTrends[name]=reactWeeks.map(w=>_flagPollMap[name][w]||0); });
+    Object.keys(_webPollMap).forEach(name=>{ webPollTrends[name]=reactWeeks.map(w=>_webPollMap[name][w]||0); });
     D.react = {
       clubs: top('Clubs')[0]||{}, flagman: top('Flagman')[0]||{}, web: top('Web')[0]||{},
       clubApps: appRows(rows,'Clubs'), flagmanApps: appRows(rows,'Flagman'), webApps: appRows(rows,'Web'),
-      clubPollTrends, flagPollTrends,
+      weeks: reactWeeks,
+      clubPollTrends, flagPollTrends, webPollTrends,
       trends: {
         clubs_polls: metricTrend(weekSeries(rows,'dimension','Clubs'), 'poll_votes'),
         clubs_likes: metricTrend(weekSeries(rows,'dimension','Clubs'), 'likes_total'),
         clubs_dislikes: metricTrend(weekSeries(rows,'dimension','Clubs'), 'dislikes_total'),
+        clubs_dislikes_posts: metricTrend(weekSeries(rows,'dimension','Clubs'), 'dislikes_posts'),
         flagman_likes: metricTrend(weekSeries(rows,'dimension','Flagman'), 'likes_total'),
+        web_likes: metricTrend(weekSeries(rows,'dimension','Web'), 'likes_total'),
+        web_polls: metricTrend(weekSeries(rows,'dimension','Web'), 'poll_votes'),
       }
     };
   }
@@ -685,12 +717,17 @@ function findStructuralInsights(D){
   dims.forEach(dim=>{
     const c = D.react && D.react[dim];
     if(!c || n(c.likes_total)===0) return;
-    const likesTotal = n(c.likes_total), likesComments = n(c.likes_comments);
+    const likesTotal = n(c.likes_total), likesComments = n(c.likes_comments), likesPosts = n(c.likes_posts), likesThreads = n(c.likes_threads||0);
     const dislikesTotal = n(c.dislikes_total), dislikesComments = n(c.dislikes_comments);
     const likingUsers = n(c.liking_users), dislikingUsers = n(c.disliking_users), pollVoters = n(c.poll_voters);
+    const surfaces = [{name:'коментарі',val:likesComments},{name:'пости',val:likesPosts},{name:'треди',val:likesThreads}];
+    surfaces.sort((a,b)=>b.val-a.val);
     s.reactionSplit[dim] = {
       likesCommentsShare: likesTotal>0 ? likesComments/likesTotal*100 : 0,
+      likesPostsShare: likesTotal>0 ? likesPosts/likesTotal*100 : 0,
+      likesThreadsShare: likesTotal>0 ? likesThreads/likesTotal*100 : 0,
       dislikesCommentsShare: dislikesTotal>0 ? dislikesComments/dislikesTotal*100 : 0,
+      dominantSurface: surfaces[0],
       likesPerUser: likingUsers>0 ? likesTotal/likingUsers : 0,
       likingUsers, dislikingUsers, pollVoters,
     };
@@ -713,131 +750,324 @@ function generateAlerts(D){
   const alerts = [];
 
   // ── STREAK ALERTS (multi-week trends) — highest priority signal ──
+  // Колір: WAU/count — >5% відносна зміна = червоний, ≤5% = сірий; retention (pp) — >3pp = червоний, ≤3pp = сірий
+
   if(D.eng && D.eng.trends){
     const t = D.eng.trends;
+
     const clubsWauStreak = streak(t.clubs_wau);
-    if(clubsWauStreak.weeksInARow>=2 && clubsWauStreak.direction<0) alerts.push({type:'red', text:`Clubs WAU падає ${clubsWauStreak.weeksInARow+1}-й тиждень поспіль — стійкий негативний тренд`});
-    if(clubsWauStreak.weeksInARow>=2 && clubsWauStreak.direction>0) alerts.push({type:'green', text:`Clubs WAU росте ${clubsWauStreak.weeksInARow+1}-й тиждень поспіль`});
+    if(clubsWauStreak.weeksInARow>=2){
+      const rp = streakRelPct(t.clubs_wau, clubsWauStreak);
+      const mag = rp!=null ? ` (${rp>0?'+':''}${rp.toFixed(1)}% за ${clubsWauStreak.weeksInARow+1} тижні)` : '';
+      if(clubsWauStreak.direction<0){
+        const color = rp!=null && Math.abs(rp)>5 ? 'red' : 'gray';
+        const full = fullRelPct(t.clubs_wau);
+        const ctx = full!=null && full>0 ? `, але загалом за ${t.clubs_wau.filter(v=>v!=null).length} тижні +${full.toFixed(1)}% — корекція після зростання` : '';
+        alerts.push({type:color, text:`Clubs WAU поступово слабшає ${clubsWauStreak.weeksInARow+1}-й тиждень поспіль${mag}${ctx}`});
+      }
+      if(clubsWauStreak.direction>0) alerts.push({type:'green', text:`Clubs WAU росте ${clubsWauStreak.weeksInARow+1}-й тиждень поспіль${mag}`});
+    }
 
     const flagmanWauStreak = streak(t.flagman_wau);
-    if(flagmanWauStreak.weeksInARow>=2 && flagmanWauStreak.direction>0) alerts.push({type:'green', text:`Flagman WAU росте ${flagmanWauStreak.weeksInARow+1}-й тиждень поспіль — стійкий драйвер`});
-    if(flagmanWauStreak.weeksInARow>=2 && flagmanWauStreak.direction<0) alerts.push({type:'red', text:`Flagman WAU падає ${flagmanWauStreak.weeksInARow+1}-й тиждень поспіль`});
+    if(flagmanWauStreak.weeksInARow>=2){
+      const rp = streakRelPct(t.flagman_wau, flagmanWauStreak);
+      const mag = rp!=null ? ` (${rp>0?'+':''}${rp.toFixed(1)}% за ${flagmanWauStreak.weeksInARow+1} тижні)` : '';
+      if(flagmanWauStreak.direction>0) alerts.push({type:'green', text:`Flagman WAU росте ${flagmanWauStreak.weeksInARow+1}-й тиждень поспіль${mag}`});
+      if(flagmanWauStreak.direction<0){
+        const full = fullRelPct(t.flagman_wau);
+        const isCorrection = full!=null && full>0;
+        const color = isCorrection ? 'gray' : (rp!=null && Math.abs(rp)>5 ? 'red' : 'gray');
+        const ctx = isCorrection ? `, але загалом за ${t.flagman_wau.filter(v=>v!=null).length} тижні +${full.toFixed(1)}% — корекція після зростання` : '';
+        alerts.push({type:color, text:`Flagman WAU поступово знижується ${flagmanWauStreak.weeksInARow+1}-й тиждень поспіль${mag}${ctx}`});
+      }
+    }
 
     const webWauStreak = streak(t.web_wau);
-    if(webWauStreak.weeksInARow>=2 && webWauStreak.direction<0) alerts.push({type:'amber', text:`Web WAU падає ${webWauStreak.weeksInARow+1}-й тиждень поспіль`});
+    if(webWauStreak.weeksInARow>=2){
+      const rp = streakRelPct(t.web_wau, webWauStreak);
+      const mag = rp!=null ? ` (${rp>0?'+':''}${rp.toFixed(1)}% за ${webWauStreak.weeksInARow+1} тижні)` : '';
+      if(webWauStreak.direction<0){
+        const color = rp!=null && Math.abs(rp)>5 ? 'red' : 'gray';
+        alerts.push({type:color, text:`Web WAU знижується ${webWauStreak.weeksInARow+1}-й тиждень поспіль${mag}`});
+      }
+      if(webWauStreak.direction>0) alerts.push({type:'green', text:`Web WAU росте ${webWauStreak.weeksInARow+1}-й тиждень поспіль${mag}`});
+    }
+
+    if(t.web_sessions){
+      const webSessStreak = streak(t.web_sessions);
+      if(webSessStreak.weeksInARow>=2 && webSessStreak.direction<0){
+        const rp = streakRelPct(t.web_sessions, webSessStreak);
+        const mag = rp!=null ? ` (${rp.toFixed(1)}% за ${webSessStreak.weeksInARow+1} тижні)` : '';
+        const color = rp!=null && Math.abs(rp)>5 ? 'red' : 'gray';
+        alerts.push({type:color, text:`Web сесії знижуються ${webSessStreak.weeksInARow+1}-й тиждень поспіль${mag}`});
+      }
+    }
+  }
+
+  if(D.ret && D.ret.trends && D.ret.trends.web_retention){
+    const t = D.ret.trends;
+    const webRetStreak = streak(t.web_retention);
+    if(webRetStreak.weeksInARow>=2 && webRetStreak.direction<0){
+      const rd = streakDelta(t.web_retention, webRetStreak);
+      const rdStr = rd!=null ? ` (${rd.toFixed(1)}pp за ${webRetStreak.weeksInARow+1} тижні)` : '';
+      const color = rd!=null && Math.abs(rd)>3 ? 'red' : 'gray';
+      alerts.push({type:color, text:`Web WAU retention знижується ${webRetStreak.weeksInARow+1}-й тиждень поспіль${rdStr}`});
+    }
   }
 
   if(D.ret && D.ret.trends){
     const t = D.ret.trends;
+    const d7Values = D.ret.d7Immature ? t.clubs_d7.slice(0,-1) : t.clubs_d7;
     const retStreak = streak(t.clubs_retention);
-    if(retStreak.weeksInARow>=2 && retStreak.direction<0) alerts.push({type:'red', text:`Clubs WAU retention знижується ${retStreak.weeksInARow+1}-й тиждень поспіль`});
+    const d7Streak = streak(d7Values);
+    const retActive = retStreak.weeksInARow>=2 && retStreak.direction<0;
+    const d7Active = d7Streak.weeksInARow>=2 && d7Streak.direction<0;
 
-    // D7 needs the cohort's last install day + 7 days to fully mature.
-    // If the most recent week is still immature, drop it from the streak calc
-    // so a half-formed D7 number doesn't get read as a real drop.
-    if(D.ret.d7Immature){
-      const matureD7 = t.clubs_d7.slice(0, -1); // exclude last (immature) week
-      const d7Streak = streak(matureD7);
-      if(d7Streak.weeksInARow>=2 && d7Streak.direction<0) alerts.push({type:'amber', text:`Clubs D7 retention знижується ${d7Streak.weeksInARow+1}-й тиждень поспіль (без врахування ${D.ret.currentWeek} — цей тиждень ще не "дозрів" для D7)`});
-      alerts.push({type:'amber', text:`D7 для тижня ${D.ret.currentWeek} ще неповний — минуло менше 13 днів від початку тижня, тому це число штучно нижче і не варто порівнювати напряму`});
-    } else {
-      const d7Streak = streak(t.clubs_d7);
-      if(d7Streak.weeksInARow>=2 && d7Streak.direction<0) alerts.push({type:'amber', text:`Clubs D7 retention знижується ${d7Streak.weeksInARow+1}-й тиждень поспіль`});
+    if(retActive || d7Active){
+      const parts = [];
+      let maxAbsDelta = 0;
+      if(retActive){
+        const rd = streakDelta(t.clubs_retention, retStreak);
+        if(rd!=null) maxAbsDelta = Math.max(maxAbsDelta, Math.abs(rd));
+        parts.push(`WAU ${rd!=null ? rd.toFixed(1)+'pp за '+(retStreak.weeksInARow+1)+' тижні' : (retStreak.weeksInARow+1)+'-й тиждень поспіль'}`);
+      }
+      if(d7Active){
+        const d7d = streakDelta(d7Values, d7Streak);
+        if(d7d!=null) maxAbsDelta = Math.max(maxAbsDelta, Math.abs(d7d));
+        const immSuffix = D.ret.d7Immature ? ` (без ${D.ret.currentWeek})` : '';
+        parts.push(`D7 ${d7d!=null ? d7d.toFixed(1)+'pp за '+(d7Streak.weeksInARow+1)+' тижні' : (d7Streak.weeksInARow+1)+'-й тиждень поспіль'}${immSuffix}`);
+      }
+      const color = maxAbsDelta>3 ? 'red' : 'gray';
+      alerts.push({type:color, text:`Clubs retention знижується: ${parts.join(', ')}`});
     }
+    if(D.ret.d7Immature) alerts.push({type:'gray', text:`D7 для тижня ${D.ret.currentWeek} ще неповний — минуло менше 13 днів, тому число штучно нижче`});
   }
 
   if(D.ugc && D.ugc.trends){
     const t = D.ugc.trends;
+
     const chattersStreak = streak(t.clubs_chatters);
-    if(chattersStreak.weeksInARow>=2 && chattersStreak.direction<0) alerts.push({type:'red', text:`Clubs chatters падають ${chattersStreak.weeksInARow+1}-й тиждень поспіль`});
+    if(chattersStreak.weeksInARow>=2 && chattersStreak.direction<0){
+      const rp = streakRelPct(t.clubs_chatters, chattersStreak);
+      const mag = rp!=null ? ` (${rp.toFixed(1)}% за ${chattersStreak.weeksInARow+1} тижні)` : '';
+      const color = rp!=null && Math.abs(rp)>5 ? 'red' : 'gray';
+      alerts.push({type:color, text:`Clubs chatters слабшають ${chattersStreak.weeksInARow+1}-й тиждень поспіль${mag}`});
+    }
 
     const commentsStreak = streak(t.clubs_comments);
-    if(commentsStreak.weeksInARow>=2 && commentsStreak.direction<0) alerts.push({type:'amber', text:`Clubs comments падають ${commentsStreak.weeksInARow+1}-й тиждень поспіль`});
+    if(commentsStreak.weeksInARow>=2 && commentsStreak.direction<0){
+      const rp = streakRelPct(t.clubs_comments, commentsStreak);
+      const mag = rp!=null ? ` (${rp.toFixed(1)}% за ${commentsStreak.weeksInARow+1} тижні)` : '';
+      alerts.push({type:'gray', text:`Clubs comments поступово знижуються ${commentsStreak.weeksInARow+1}-й тиждень поспіль${mag}`});
+    }
 
     const flagChattersStreak = streak(t.flagman_chatters);
-    if(flagChattersStreak.weeksInARow>=2 && flagChattersStreak.direction>0) alerts.push({type:'green', text:`Flagman chatters ростуть ${flagChattersStreak.weeksInARow+1}-й тиждень поспіль`});
+    if(flagChattersStreak.weeksInARow>=2 && flagChattersStreak.direction>0){
+      const rp = streakRelPct(t.flagman_chatters, flagChattersStreak);
+      const mag = rp!=null ? ` (+${rp.toFixed(1)}% за ${flagChattersStreak.weeksInARow+1} тижні)` : '';
+      alerts.push({type:'green', text:`Flagman chatters ростуть ${flagChattersStreak.weeksInARow+1}-й тиждень поспіль${mag}`});
+    }
 
     const flagThreadsStreak = streak(t.flagman_threads);
-    if(flagThreadsStreak.weeksInARow>=2 && flagThreadsStreak.direction>0) alerts.push({type:'green', text:`Flagman threads ростуть ${flagThreadsStreak.weeksInARow+1}-й тиждень поспіль — стійкий драйвер формату`});
+    if(flagThreadsStreak.weeksInARow>=2 && flagThreadsStreak.direction>0){
+      const rp = streakRelPct(t.flagman_threads, flagThreadsStreak);
+      const mag = rp!=null ? ` (+${rp.toFixed(1)}% за ${flagThreadsStreak.weeksInARow+1} тижні)` : '';
+      alerts.push({type:'green', text:`Flagman threads ростуть ${flagThreadsStreak.weeksInARow+1}-й тиждень поспіль${mag} — формат набирає обертів`});
+    }
+
+    if(t.web_chatters){
+      const webChatStreak = streak(t.web_chatters);
+      if(webChatStreak.weeksInARow>=2 && webChatStreak.direction<0){
+        const rp = streakRelPct(t.web_chatters, webChatStreak);
+        const mag = rp!=null ? ` (${rp.toFixed(1)}% за ${webChatStreak.weeksInARow+1} тижні)` : '';
+        const color = rp!=null && Math.abs(rp)>5 ? 'red' : 'gray';
+        alerts.push({type:color, text:`Web chatters слабшають ${webChatStreak.weeksInARow+1}-й тиждень поспіль${mag}`});
+      }
+    }
   }
 
   if(D.subs && D.subs.trends){
     const t = D.subs.trends;
+
     const followsStreak = streak(t.clubs_follows);
-    if(followsStreak.weeksInARow>=2 && followsStreak.direction<0) alerts.push({type:'amber', text:`Clubs follows знижуються ${followsStreak.weeksInARow+1}-й тиждень поспіль`});
-
     const unfollowsStreak = streak(t.clubs_unfollows);
-    if(unfollowsStreak.weeksInARow>=2 && unfollowsStreak.direction>0) alerts.push({type:'amber', text:`Clubs unfollows ростуть ${unfollowsStreak.weeksInARow+1}-й тиждень поспіль`});
-
     const netStreak = streak(t.clubs_net);
-    if(netStreak.weeksInARow>=2 && netStreak.direction<0) alerts.push({type:'red', text:`Clubs net growth підписок знижується ${netStreak.weeksInARow+1}-й тиждень поспіль`});
+
+    const followsDown = followsStreak.weeksInARow>=2 && followsStreak.direction<0;
+    const unfollowsUp = unfollowsStreak.weeksInARow>=2 && unfollowsStreak.direction>0;
+    const netDown = netStreak.weeksInARow>=2 && netStreak.direction<0;
+
+    if(followsDown || netDown){
+      const parts = [];
+      let maxAbsRp = 0;
+      if(followsDown){
+        const rp = streakRelPct(t.clubs_follows, followsStreak);
+        if(rp!=null) maxAbsRp = Math.max(maxAbsRp, Math.abs(rp));
+        parts.push(`follows ${rp!=null ? rp.toFixed(1)+'% за '+(followsStreak.weeksInARow+1)+' тижні' : (followsStreak.weeksInARow+1)+'-й тиждень поспіль'}`);
+      }
+      if(netDown){
+        const rp = streakRelPct(t.clubs_net, netStreak);
+        if(rp!=null) maxAbsRp = Math.max(maxAbsRp, Math.abs(rp));
+        parts.push(`net growth ${rp!=null ? rp.toFixed(1)+'% за '+(netStreak.weeksInARow+1)+' тижні' : (netStreak.weeksInARow+1)+'-й тиждень поспіль'}`);
+      }
+      const color = maxAbsRp>5 ? 'red' : 'gray';
+      alerts.push({type:color, text:`Clubs підписки знижуються: ${parts.join(', ')}`});
+    }
+
+    if(unfollowsUp){
+      const rp = streakRelPct(t.clubs_unfollows, unfollowsStreak);
+      const mag = rp!=null ? ` (+${rp.toFixed(1)}% за ${unfollowsStreak.weeksInARow+1} тижні)` : '';
+      const color = rp!=null && Math.abs(rp)>5 ? 'red' : 'gray';
+      alerts.push({type:color, text:`Clubs unfollows ростуть ${unfollowsStreak.weeksInARow+1}-й тиждень поспіль${mag}`});
+    }
+
+    if(t.web_follows){
+      const webFollowsStreak = streak(t.web_follows);
+      const webNetStreak = t.web_net ? streak(t.web_net) : {weeksInARow:0};
+      const wfDown = webFollowsStreak.weeksInARow>=2 && webFollowsStreak.direction<0;
+      const wnDown = webNetStreak.weeksInARow>=2 && webNetStreak.direction<0;
+      if(wfDown || wnDown){
+        const parts = [];
+        let maxAbsRp = 0;
+        if(wfDown){ const rp=streakRelPct(t.web_follows,webFollowsStreak); if(rp!=null) maxAbsRp=Math.max(maxAbsRp,Math.abs(rp)); parts.push(`follows ${rp!=null?rp.toFixed(1)+'% за '+(webFollowsStreak.weeksInARow+1)+' тижні':(webFollowsStreak.weeksInARow+1)+'-й тиждень поспіль'}`); }
+        if(wnDown){ const rp=streakRelPct(t.web_net,webNetStreak); if(rp!=null) maxAbsRp=Math.max(maxAbsRp,Math.abs(rp)); parts.push(`net growth ${rp!=null?rp.toFixed(1)+'% за '+(webNetStreak.weeksInARow+1)+' тижні':(webNetStreak.weeksInARow+1)+'-й тиждень поспіль'}`); }
+        alerts.push({type:maxAbsRp>5?'red':'gray', text:`Web підписки знижуються: ${parts.join(', ')}`});
+      }
+    }
   }
 
   if(D.react && D.react.trends){
     const t = D.react.trends;
-    const likesStreak = streak(t.clubs_likes);
-    if(likesStreak.weeksInARow>=2 && likesStreak.direction<0) alerts.push({type:'amber', text:`Clubs likes знижуються ${likesStreak.weeksInARow+1}-й тиждень поспіль`});
 
-    const dislikesStreak = streak(t.clubs_dislikes);
-    if(dislikesStreak.weeksInARow>=2 && dislikesStreak.direction>0) alerts.push({type:'amber', text:`Clubs dislikes ростуть ${dislikesStreak.weeksInARow+1}-й тиждень поспіль — варто перевірити якість контенту`});
+    const likesStreak = streak(t.clubs_likes);
+    if(likesStreak.weeksInARow>=2 && likesStreak.direction<0){
+      const rp = streakRelPct(t.clubs_likes, likesStreak);
+      const mag = rp!=null ? ` (${rp.toFixed(1)}% за ${likesStreak.weeksInARow+1} тижні)` : '';
+      alerts.push({type:'gray', text:`Clubs likes поступово знижуються ${likesStreak.weeksInARow+1}-й тиждень поспіль${mag}`});
+    }
+
+    const dislikesPostsStreak = streak(t.clubs_dislikes_posts);
+    if(dislikesPostsStreak.weeksInARow>=2 && dislikesPostsStreak.direction>0){
+      const rp = streakRelPct(t.clubs_dislikes_posts, dislikesPostsStreak);
+      const mag = rp!=null ? ` (+${rp.toFixed(1)}% за ${dislikesPostsStreak.weeksInARow+1} тижні)` : '';
+      alerts.push({type:'red', text:`Clubs dislikes на постах ростуть ${dislikesPostsStreak.weeksInARow+1}-й тиждень поспіль${mag} — варто перевірити якість контенту`});
+    }
 
     const pollsStreak = streak(t.clubs_polls);
-    if(pollsStreak.weeksInARow>=2 && pollsStreak.direction>0) alerts.push({type:'green', text:`Clubs poll votes ростуть ${pollsStreak.weeksInARow+1}-й тиждень поспіль`});
+    if(pollsStreak.weeksInARow>=2 && pollsStreak.direction>0){
+      const rp = streakRelPct(t.clubs_polls, pollsStreak);
+      const mag = rp!=null ? ` (+${rp.toFixed(1)}% за ${pollsStreak.weeksInARow+1} тижні)` : '';
+      alerts.push({type:'green', text:`Clubs poll votes ростуть ${pollsStreak.weeksInARow+1}-й тиждень поспіль${mag}`});
+    }
+
+    if(t.web_likes){
+      const webLikesStreak = streak(t.web_likes);
+      if(webLikesStreak.weeksInARow>=2 && webLikesStreak.direction<0){
+        const rp = streakRelPct(t.web_likes, webLikesStreak);
+        const mag = rp!=null ? ` (${rp.toFixed(1)}% за ${webLikesStreak.weeksInARow+1} тижні)` : '';
+        const color = rp!=null && Math.abs(rp)>5 ? 'red' : 'gray';
+        alerts.push({type:color, text:`Web likes знижуються ${webLikesStreak.weeksInARow+1}-й тиждень поспіль${mag}`});
+      }
+    }
+
+    if(t.web_polls){
+      const webPollsStreak = streak(t.web_polls);
+      if(webPollsStreak.weeksInARow>=2 && webPollsStreak.direction>0){
+        const rp = streakRelPct(t.web_polls, webPollsStreak);
+        const mag = rp!=null ? ` (+${rp.toFixed(1)}% за ${webPollsStreak.weeksInARow+1} тижні)` : '';
+        alerts.push({type:'green', text:`Web poll votes ростуть ${webPollsStreak.weeksInARow+1}-й тиждень поспіль${mag}`});
+      }
+    }
   }
 
   // ── SINGLE-WEEK ALERTS (WoW thresholds) ──
   if(D.eng){
     const c=D.eng.clubs, f=D.eng.flagman, w=D.eng.web;
-    if(n(c.wau_wow_pct)<-3) alerts.push({type:'red', text:`Clubs WAU падає ${pct(c.wau_wow_pct)} — третій тиждень може бути критичним`});
-    if(n(c.wau_wow_pct)<0 && n(c.sessions_wow_pct)<-5) alerts.push({type:'red', text:`Clubs: WAU і сесії падають одночасно (WAU ${pct(c.wau_wow_pct)}, Sessions ${pct(c.sessions_wow_pct)})`});
+    if(n(c.wau_wow_pct)<-5) alerts.push({type:'red', text:`Clubs WAU значно просів: ${pct(c.wau_wow_pct)} за тиждень`});
+    if(n(c.wau_wow_pct)<0 && n(c.sessions_wow_pct)<-5) alerts.push({type:'red', text:`Clubs сесії падають швидше WAU за останній тиждень: Sessions ${pct(c.sessions_wow_pct)}, WAU ${pct(c.wau_wow_pct)} — активні юзери заходять рідше`});
     if(n(f.wau_wow_pct)>5) alerts.push({type:'green', text:`Flagman — сильне зростання WAU: ${pct(f.wau_wow_pct)} WoW`});
     if(n(w.wau_wow_pct)<-10 && D.eng.webApps && D.eng.webApps.length){
       const worst = [...D.eng.webApps].sort((a,b)=>n(a.wau_wow_pct)-n(b.wau_wow_pct))[0];
-      alerts.push({type:'amber', text:`Web WAU суттєво падає: ${pct(w.wau_wow_pct)} — найбільший внесок дає ${worst.app_name} (${pct(worst.wau_wow_pct)})`});
+      alerts.push({type:'gray', text:`Web WAU суттєво знизився за тиждень: ${pct(w.wau_wow_pct)} — найбільший внесок: ${worst.app_name} (${pct(worst.wau_wow_pct)})`});
     }
-    if(n(w.sessions_wow_pct)>0 && n(w.wau_wow_pct)<0) alerts.push({type:'amber', text:`Web: WAU падає, але сесії ростуть — активних менше, але вони глибше залучені`});
+    if(n(w.sessions_wow_pct)>0 && n(w.wau_wow_pct)<0) alerts.push({type:'gray', text:`Web за тиждень: WAU знижується, але сесії ростуть — активних менше, але вони глибше залучені`});
   }
 
   if(D.ret){
     const c=D.ret.clubs, f=D.ret.flagman, w=D.ret.web;
-    if(n(c.d1_wow_pp)<-2 && n(c.d7_wow_pp)<-1) alerts.push({type:'red', text:`Clubs: D1 (${pp(c.d1_wow_pp)}) і D7 (${pp(c.d7_wow_pp)}) одночасно падають — онбординг не утримує`});
+    if(n(c.d1_wow_pp)<-2 && n(c.d7_wow_pp)<-1) alerts.push({type:'red', text:`Clubs за тиждень: D1 (${pp(c.d1_wow_pp)}) і D7 (${pp(c.d7_wow_pp)}) одночасно знижуються — нові юзери не повертаються`});
     if(n(f.d1_wow_pp)>1) alerts.push({type:'green', text:`Flagman D1 retention покращився: ${pp(f.d1_wow_pp)} WoW`});
-    if(n(c.retention_wow_pp)<-2) alerts.push({type:'red', text:`Clubs WAU retention: ${pp(c.retention_wow_pp)} — значна частина аудиторії не повертається`});
-    if(n(c.retention_wow_pp)>1) alerts.push({type:'green', text:`Clubs WAU retention зростає: ${pp(c.retention_wow_pp)}`});
+    if(n(c.retention_wow_pp)<-2) alerts.push({type:'red', text:`Clubs WAU retention: ${pp(c.retention_wow_pp)} WoW — помітна частина аудиторії не повертається`});
+    if(n(c.retention_wow_pp)>1) alerts.push({type:'green', text:`Clubs WAU retention зростає: ${pp(c.retention_wow_pp)} WoW`});
+    if(n(f.retention_wow_pp)<-2) alerts.push({type:'gray', text:`Flagman WAU retention: ${pp(f.retention_wow_pp)} WoW`});
+    if(n(f.retention_wow_pp)>1) alerts.push({type:'green', text:`Flagman WAU retention покращився: ${pp(f.retention_wow_pp)} WoW`});
+    if(w && n(w.retention_wow_pp)<-3) alerts.push({type:'gray', text:`Web WAU retention: ${pp(w.retention_wow_pp)} WoW`});
+    if(w && n(w.d1_wow_pp)<-2) alerts.push({type:'gray', text:`Web D1 retention: ${pp(w.d1_wow_pp)} WoW`});
   }
 
   if(D.ugc){
     const c=D.ugc.clubs;
-    if(n(c.chatters_wow_pct)<-20) alerts.push({type:'red', text:`Clubs chatters падають ${pct(c.chatters_wow_pct)} — активність у чатах різко знизилась`});
-    if(n(c.commentators_wow_pct)<-10) alerts.push({type:'amber', text:`Commentators у Clubs: ${pct(c.commentators_wow_pct)} WoW`});
+    if(n(c.chatters_wow_pct)<-20) alerts.push({type:'red', text:`Clubs chatters за тиждень: ${pct(c.chatters_wow_pct)} — активність у чатах різко знизилась`});
+    if(n(c.commentators_wow_pct)<-10) alerts.push({type:'gray', text:`Commentators у Clubs: ${pct(c.commentators_wow_pct)} WoW`});
     const f=D.ugc.flagman;
-    if(n(f.threads_wow_pct)>50) alerts.push({type:'green', text:`Flagman Threads вибух: ${pct(f.threads_wow_pct)} WoW — формат набирає аудиторію`});
-    if(n(f.chatters_wow_pct)>30) alerts.push({type:'green', text:`Flagman chatters ростуть: ${pct(f.chatters_wow_pct)} — чати активуються`});
+    if(n(f.threads_wow_pct)>50) alerts.push({type:'green', text:`Flagman Threads: ${pct(f.threads_wow_pct)} WoW — формат набирає аудиторію`});
+    if(n(f.chatters_wow_pct)>30) alerts.push({type:'green', text:`Flagman chatters: ${pct(f.chatters_wow_pct)} WoW — чати активуються`});
+    const wb=D.ugc.web;
+    if(wb && n(wb.chatters_wow_pct)<-20) alerts.push({type:'gray', text:`Web chatters за тиждень: ${pct(wb.chatters_wow_pct)}`});
   }
 
   if(D.subs){
     const c=D.subs.clubs, f=D.subs.flagman;
-    if(n(c.unfollows_wow_pct)>15 && n(c.unfollows_wow_pct)>n(c.follows_wow_pct)*2) alerts.push({type:'amber', text:`Clubs unfollows ростуть швидше follows (${pct(c.unfollows_wow_pct)} vs ${pct(c.follows_wow_pct)})`});
+    if(n(c.unfollows_wow_pct)>15 && n(c.unfollows_wow_pct)>n(c.follows_wow_pct)*2) alerts.push({type:'gray', text:`Clubs unfollows ростуть швидше follows WoW (${pct(c.unfollows_wow_pct)} vs ${pct(c.follows_wow_pct)})`});
     if(n(f.follows_wow_pct)>50) alerts.push({type:'green', text:`Flagman follows: вибух підписок ${pct(f.follows_wow_pct)} WoW`});
+    if(n(f.follows_wow_pct)<-20) alerts.push({type:'gray', text:`Flagman follows: ${pct(f.follows_wow_pct)} WoW`});
+    const wb=D.subs.web;
+    if(wb && n(wb.follows_wow_pct)>30) alerts.push({type:'green', text:`Web follows: ${pct(wb.follows_wow_pct)} WoW`});
+    if(wb && n(wb.follows_wow_pct)<-20) alerts.push({type:'gray', text:`Web follows: ${pct(wb.follows_wow_pct)} WoW`});
+    if(wb && n(wb.net_wow_pct)<-20) alerts.push({type:'gray', text:`Web net growth підписок: ${pct(wb.net_wow_pct)} WoW`});
   }
 
   if(D.react){
     const c=D.react.clubs;
-    const likeRatio = n(c.likes_total)/Math.max(n(c.dislikes_total),1);
-    if(n(c.polls_wow_pct)>100) alerts.push({type:'green', text:`Poll Votes у Clubs: ${pct(c.polls_wow_pct)} — ймовірно великий матч або подія`});
-    if(n(c.polls_wow_pct)<-50) alerts.push({type:'amber', text:`Poll Votes у Clubs впали на ${pct(c.polls_wow_pct)} — ймовірно минулого тижня була разова подія (матч), і це повернення до норми, а не проблема`});
-    if(n(c.dislikes_wow_pct)>20 && n(c.dislikes_wow_pct)>n(c.likes_wow_pct)+15) alerts.push({type:'amber', text:`Дизлайки ростуть швидше лайків (${pct(c.dislikes_wow_pct)} vs ${pct(c.likes_wow_pct)}) — якість контенту під питанням`});
-    if(n(c.likes_wow_pct)<-10) alerts.push({type:'amber', text:`Likes у Clubs: ${pct(c.likes_wow_pct)} — залученість падає`});
-    if(likeRatio < 5) alerts.push({type:'amber', text:`Like/dislike ratio у Clubs всього ${likeRatio.toFixed(1)}× — нижче здорового рівня незалежно від WoW динаміки`});
+    const postsRatio = n(c.likes_posts)/Math.max(n(c.dislikes_posts),1);
+    if(n(c.polls_wow_pct)>30) alerts.push({type:'green', text:`Poll Votes у Clubs: ${pct(c.polls_wow_pct)} WoW — висока подійна активність`});
+    if(n(c.polls_wow_pct)<-50) alerts.push({type:'gray', text:`Poll Votes у Clubs: ${pct(c.polls_wow_pct)} WoW — ймовірно минулого тижня була разова подія, це повернення до норми`});
+    const f=D.react.flagman;
+    if(f && n(f.polls_wow_pct)>30) alerts.push({type:'green', text:`Poll Votes у Flagman: ${pct(f.polls_wow_pct)} WoW`});
+    if(f && n(f.likes_wow_pct)<-10) alerts.push({type:'gray', text:`Likes у Flagman: ${pct(f.likes_wow_pct)} WoW`});
+    const wb=D.react.web;
+    if(wb && n(wb.polls_wow_pct)>30) alerts.push({type:'green', text:`Poll Votes у Web: ${pct(wb.polls_wow_pct)} WoW`});
+    if(wb && n(wb.likes_wow_pct)<-10) alerts.push({type:'gray', text:`Likes у Web: ${pct(wb.likes_wow_pct)} WoW`});
+    if(n(c.likes_wow_pct)<-10) alerts.push({type:'gray', text:`Likes у Clubs: ${pct(c.likes_wow_pct)} WoW — залученість дещо знизилась`});
+    if(n(c.dislikes_posts)>0 && postsRatio < 5) alerts.push({type:'gray', text:`Like/dislike ratio на постах у Clubs: ${postsRatio.toFixed(1)}× — нижче комфортного рівня (норма >5×)`});
   }
 
   if(D.fnew){
     const c=D.fnew.clubs, f=D.fnew.flagman;
-    if(n(c.reacted_wow_pp)<-2) alerts.push({type:'red', text:`New users Clubs: конверсія Install→Reacted ${pp(c.reacted_wow_pp)} — онбординг погіршується`});
-    if(n(f.reacted_wow_pp)>2) alerts.push({type:'green', text:`New users Flagman: конверсія Install→Reacted ${pp(f.reacted_wow_pp)} — онбординг покращується`});
+    if(n(c.reacted_wow_pp)<-2) alerts.push({type:'red', text:`New users Clubs: конверсія Install→Reacted ${pp(c.reacted_wow_pp)} — залучення нових юзерів погіршується`});
+    if(n(f.reacted_wow_pp)>2) alerts.push({type:'green', text:`New users Flagman: конверсія Install→Reacted ${pp(f.reacted_wow_pp)} — залучення нових юзерів покращується`});
   }
 
-  return alerts.slice(0,8);
+  const order = {red:0, green:1, gray:2};
+  function platformOf(a){
+    if(/\bWeb\b/i.test(a.text)) return 2;
+    if(/\bFlagman\b/i.test(a.text)) return 1;
+    return 0;
+  }
+  alerts.sort((a,b)=>{
+    const pd = platformOf(a)-platformOf(b);
+    if(pd!==0) return pd;
+    return (order[a.type]||2)-(order[b.type]||2);
+  });
+  const platformLabels = ['Clubs','Flagman','Web'];
+  const result = [];
+  let lastPlatform = -1;
+  alerts.forEach(a=>{
+    const p = platformOf(a);
+    if(p!==lastPlatform){ result.push({type:'separator', text:platformLabels[p]}); lastPlatform=p; }
+    result.push(a);
+  });
+  return result;
 }
 
 function generateInsights(D){
@@ -903,8 +1133,20 @@ function renderReport(D){
   if(D.alerts && D.alerts.length){
     html += '<div class="section-label">Критичні зміни</div><div class="alerts-section">';
     D.alerts.forEach(a=>{
+      if(a.type==='separator'){ html += `<div class="alert-separator">${a.text}</div>`; return; }
       const icon = a.type==='red'?'🔴':a.type==='green'?'🟢':'🟡';
       html += `<div class="alert-row alert-${a.type}"><span class="alert-icon">${icon}</span>${a.text}</div>`;
+    });
+    html += '</div>';
+  }
+
+  // ── DEEP ANALYSIS (after alerts) ──
+  if(D.deepAnalysis && D.deepAnalysis.length){
+    html += '<div class="section-label">Аналіз</div><div class="alerts-section">';
+    const _typeMap = {'#f87171':['red','🔴'],'#fbbf24':['amber','🟡'],'#4ade80':['green','🟢'],'#9ca3af':['amber','ℹ️']};
+    D.deepAnalysis.forEach(item=>{
+      const [cls,icon] = _typeMap[item.color]||['amber','🟡'];
+      html += `<div class="alert-row alert-${cls}"><span class="alert-icon">${icon}</span><div><b>${item.title}</b><br><span style="font-weight:400;opacity:0.9">${item.body}</span></div></div>`;
     });
     html += '</div>';
   }
@@ -913,22 +1155,22 @@ function renderReport(D){
   if(D.eng){
     const appsKeyMap = {clubs:'clubApps', flagman:'flagmanApps', web:'webApps'};
     const topLabelMap = {clubs:'Топ клуб', flagman:'Топ апка', web:'Топ сайт'};
-    html += '<div class="section-label">Engagement'+(D.eng.weeks&&D.eng.weeks.length>1?` <span style="font-weight:400;text-transform:none;letter-spacing:0;color:#374151">(тренд за ${D.eng.weeks.length} тижні: ${D.eng.weeks.join(' → ')})</span>`:'')+'</div><div class="g3">';
+    html += '<div class="section-label">Engagement</div><div class="g3">';
     gcArr.forEach(([dim,label])=>{
       const r = D.eng[dim]; if(!r) return;
       const color = gc[dim];
       const trendVals = D.eng.trends ? D.eng.trends[dim+'_wau'] : null;
-      const spark = trendVals ? sparkline(trendVals, color, 60, 22) : '';
+      const spark = trendVals ? sparkline(trendVals, color, 120, 28, D.eng.weeks) : '';
       const apps = D.eng[appsKeyMap[dim]]||[];
       const topApp = apps.length ? [...apps].sort((a,b)=>n(b.wau)-n(a.wau))[0] : null;
       html += `<div class="card">
         <div class="ct" style="color:${color}">${label}</div>
-        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">
-          <div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <div style="flex-shrink:0">
             <div class="bn">${fmtBig(r.wau)}</div>
             <div class="bl">WAU <span class="${colorClass(r.wau_wow_pct)}" style="font-family:monospace;font-weight:700">${pct(r.wau_wow_pct)}</span></div>
           </div>
-          ${spark?`<div style="flex-shrink:0;padding-top:4px">${spark}</div>`:''}
+          ${spark?`<div style="flex:1;display:flex;align-items:center;justify-content:flex-end">${spark}</div>`:''}
         </div>
         <div style="border-top:1px solid #252836;margin:10px 0"></div>
         <div class="mr"><span class="ml">MAU trailing</span><span class="mv">${fmtBig(r.mau_trailing)}</span></div>
@@ -1006,15 +1248,20 @@ function renderReport(D){
     gcArr.forEach(([dim,lbl])=>{
       const rc = D.structural&&D.structural.retentionCliff&&D.structural.retentionCliff[dim];
       if(!rc){ html += `<div class="card"><div class="ct">Провал retention (${lbl})</div><div style="color:#6b7280;font-size:12px">Немає даних</div></div>`; return; }
+      const rd = D.ret&&D.ret[dim]||{};
+      const d1wow = n(rd.d1_wow_pp), d7wow = n(rd.d7_wow_pp);
+      const d1wowHtml = d1wow>0.05?`<span style="color:#4ade80;font-size:9px">+${d1wow.toFixed(1)}pp</span>`:d1wow<-0.05?`<span style="color:#f87171;font-size:9px">${d1wow.toFixed(1)}pp</span>`:`<span style="color:#6b7280;font-size:9px">±0pp</span>`;
+      const d7wowHtml = d7wow>0.05?`<span style="color:#4ade80;font-size:9px">+${d7wow.toFixed(1)}pp</span>`:d7wow<-0.05?`<span style="color:#f87171;font-size:9px">${d7wow.toFixed(1)}pp</span>`:`<span style="color:#6b7280;font-size:9px">±0pp</span>`;
       const isRed=rc.dropD0D1>40, alertBg=isRed?'#2a1215':'#1c1208', alertBorder=isRed?'#7f1d1d':'#78350f', alertText=isRed?'#fca5a5':'#fde68a';
       html += `<div class="card">
         <div class="ct" style="color:${gc[dim]}">Провал retention (${lbl})</div>
         <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px">
           <div style="background:#1e2130;border-radius:8px;padding:9px 10px;text-align:center"><div style="font-size:10px;color:#6b7280;margin-bottom:4px">D0</div><div style="font-family:monospace;font-size:18px;font-weight:700;color:${gc[dim]}">${rc.d0.toFixed(0)}%</div></div>
-          <div style="background:#1e2130;border-radius:8px;padding:9px 10px;text-align:center"><div style="font-size:10px;color:#6b7280;margin-bottom:4px">D1 <span style="color:#f87171;font-size:9px">−${rc.dropD0D1.toFixed(1)}pp</span></div><div style="font-family:monospace;font-size:18px;font-weight:700;color:${rc.steepest==='D0→D1'?'#f87171':'#e8eaf0'}">${rc.d1.toFixed(0)}%</div></div>
-          <div style="background:#1e2130;border-radius:8px;padding:9px 10px;text-align:center"><div style="font-size:10px;color:#6b7280;margin-bottom:4px">D7 <span style="color:#f87171;font-size:9px">−${rc.dropD1D7.toFixed(1)}pp</span></div><div style="font-family:monospace;font-size:18px;font-weight:700;color:${rc.steepest==='D1→D7'?'#f87171':'#e8eaf0'}">${rc.d7.toFixed(0)}%</div></div>
+          <div style="background:#1e2130;border-radius:8px;padding:9px 10px;text-align:center"><div style="font-size:10px;color:#6b7280;margin-bottom:4px">D1 ${d1wowHtml}</div><div style="font-family:monospace;font-size:18px;font-weight:700;color:${rc.steepest==='D0→D1'?'#f87171':'#e8eaf0'}">${rc.d1.toFixed(0)}%</div></div>
+          <div style="background:#1e2130;border-radius:8px;padding:9px 10px;text-align:center"><div style="font-size:10px;color:#6b7280;margin-bottom:4px">D7 ${d7wowHtml}</div><div style="font-family:monospace;font-size:18px;font-weight:700;color:${rc.steepest==='D1→D7'?'#f87171':'#e8eaf0'}">${rc.d7.toFixed(0)}%</div></div>
         </div>
         <div style="background:${alertBg};border:1px solid ${alertBorder};border-radius:8px;padding:9px 12px;font-size:12px;color:${alertText};line-height:1.5">${(100-rc.d1).toFixed(0)}% не повертаються на наступний день — найгостріший момент ${rc.steepest}</div>
+        ${dim==='web'?`<div style="font-size:11px;color:#4b5563;margin-top:8px">* Web installs — це перші візити з незнайомого браузера (cookie), а не реєстрації. Низький retention для веба очікуваний: більшість читачів приходять з пошуку на одну статтю і не повертаються.</div>`:''}
       </div>`;
     });
     html += '</div>';
@@ -1025,27 +1272,30 @@ function renderReport(D){
     html += '<div class="section-label">UGC</div>';
     // Chip matrix 8 rows × 3 groups
     const ugcRows = [
-      {lbl:'Commentators',  f:'commentators',         w:'commentators_wow_pct'},
-      {lbl:'Comments',      f:'total_comments',        w:'comments_wow_pct'},
-      {lbl:'Chatters',      f:'chatters',              w:'chatters_wow_pct'},
-      {lbl:'Chat messages', f:'total_chat_messages',   w:'chat_messages_wow_pct'},
-      {lbl:'Blog authors',  f:'blog_authors',          w:'blog_authors_wow_pct'},
-      {lbl:'Blogs created', f:'blogs_created',         w:'blogs_wow_pct'},
-      {lbl:'Thread authors',f:'thread_authors',        w:'thread_authors_wow_pct'},
-      {lbl:'Threads *',     f:'threads_created',       w:'threads_wow_pct'},
+      {lbl:'Commentators',  f:'commentators',         w:'commentators_wow_pct',    tf:'commentators'},
+      {lbl:'Comments',      f:'total_comments',        w:'comments_wow_pct',        tf:'comments'},
+      {lbl:'Chatters',      f:'chatters',              w:'chatters_wow_pct',        tf:'chatters'},
+      {lbl:'Chat messages', f:'total_chat_messages',   w:'chat_messages_wow_pct',   tf:'chat_messages'},
+      {lbl:'Blog authors',  f:'blog_authors',          w:'blog_authors_wow_pct',    tf:'blog_authors'},
+      {lbl:'Blogs created', f:'blogs_created',         w:'blogs_wow_pct',           tf:'blogs_created'},
+      {lbl:'Thread authors',f:'thread_authors',        w:'thread_authors_wow_pct',  tf:'thread_authors'},
+      {lbl:'Threads *',     f:'threads_created',       w:'threads_wow_pct',         tf:'threads'},
     ];
     html += '<div class="card" style="margin-bottom:12px">';
-    html += '<div style="display:grid;grid-template-columns:120px repeat(3,1fr);gap:5px;margin-bottom:6px"><div></div>';
+    html += '<div style="display:grid;grid-template-columns:120px repeat(3,1fr);gap:8px;margin-bottom:8px"><div></div>';
     gcArr.forEach(([dim,lbl])=>{ html += `<div style="font-size:10px;font-weight:600;color:${gc[dim]};text-align:center">${lbl}</div>`; });
     html += '</div>';
     ugcRows.forEach(rd=>{
-      html += '<div style="display:grid;grid-template-columns:120px repeat(3,1fr);gap:5px;margin-bottom:5px">';
+      html += '<div style="display:grid;grid-template-columns:120px repeat(3,1fr);gap:8px;margin-bottom:8px">';
       html += `<div style="display:flex;align-items:center;font-size:10px;color:#9ca3af">${rd.lbl}</div>`;
       gcArr.forEach(([dim])=>{
         const r=D.ugc[dim]||{}, val=n(r[rd.f]), wow=n(r[rd.w]), hasWow=r[rd.w]!=null&&r[rd.w]!=='';
-        html += `<div style="background:#1e2130;border-radius:8px;padding:7px;text-align:center">
-          <div style="font-family:monospace;font-size:13px;font-weight:700;color:#fff">${val?fmtBig(val):'0'}</div>
-          ${hasWow?`<div style="font-family:monospace;font-size:10px;color:${wow>=0?'#4ade80':'#f87171'};margin-top:1px">${pct(wow)}</div>`:''}
+        const tv=D.ugc.trends&&rd.tf?D.ugc.trends[dim+'_'+rd.tf]:null;
+        const spark=tv?sparkline(tv,gc[dim],50,18,D.ugc.weeks):'';
+        html += `<div style="background:#1e2130;border-radius:8px;padding:8px 12px;display:flex;align-items:center;justify-content:center;gap:8px">
+          <div style="font-family:monospace;font-size:13px;font-weight:700;color:#fff;flex-shrink:0">${val?fmtBig(val):'0'}</div>
+          ${hasWow?`<div style="font-family:monospace;font-size:10px;color:${wow>=0?'#4ade80':'#f87171'};flex-shrink:0">${pct(wow)}</div>`:''}
+          ${spark?`<div style="flex-shrink:0">${spark}</div>`:''}
         </div>`;
       });
       html += '</div>';
@@ -1105,12 +1355,15 @@ function renderReport(D){
       html += `<div class="card"><div class="ct" style="color:${gc.clubs}">Poll Votes — Clubs</div>`;
       apps.forEach((r,i)=>{
         const pv=n(r.poll_votes), wow=n(r.polls_wow_pct), share=total>0?pv/total*100:0;
+        const tv=D.react.clubPollTrends&&D.react.clubPollTrends[r.app_name];
+        const spark=tv?sparkline(tv,gc.clubs,50,14,D.react.weeks):'';
         html += `<div style="display:flex;align-items:center;gap:6px;padding:4px 0;border-bottom:1px solid #1a1d27;font-size:11px">
           <span style="font-size:10px;color:#6b7280;width:14px;flex-shrink:0">${i+1}.</span>
           <span style="flex:1;color:#e8eaf0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.app_name}</span>
           <span style="font-family:monospace;font-size:11px;font-weight:700;color:#fff;flex-shrink:0;width:38px;text-align:right">${fmtBig(pv)}</span>
           <span style="font-family:monospace;font-size:10px;color:${gc.clubs};flex-shrink:0;width:34px;text-align:right">${share.toFixed(1)}%</span>
           <span style="font-family:monospace;font-size:10px;color:${wow>=0?'#4ade80':'#f87171'};flex-shrink:0;width:40px;text-align:right">${pct(wow)}</span>
+          ${spark?`<span style="flex-shrink:0">${spark}</span>`:''}
         </div>`;
       });
       html += '</div>';
@@ -1121,14 +1374,18 @@ function renderReport(D){
       const apps=(D.react[dim+'Apps']||[]).filter(r=>n(r.poll_votes)>0).sort((a,b)=>n(b.poll_votes)-n(a.poll_votes));
       const total=n(D.react[dim]&&D.react[dim].poll_votes)||0;
       html += `<div style="font-size:10px;font-weight:600;color:${gc[dim]};margin:8px 0 4px">${dim==='flagman'?'Flagman':'Web'}</div>`;
+      const pollTrendMap = dim==='flagman' ? D.react.flagPollTrends : D.react.webPollTrends;
       apps.forEach((r,i)=>{
         const pv=n(r.poll_votes), wow=n(r.polls_wow_pct), share=total>0?pv/total*100:0;
+        const tv=pollTrendMap&&pollTrendMap[r.app_name];
+        const spark=tv?sparkline(tv,gc[dim],50,14,D.react.weeks):'';
         html += `<div style="display:flex;align-items:center;gap:6px;padding:3px 0;border-bottom:1px solid #1a1d27;font-size:11px">
           <span style="font-size:10px;color:#6b7280;width:14px;flex-shrink:0">${i+1}.</span>
           <span style="flex:1;color:#e8eaf0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.app_name}</span>
           <span style="font-family:monospace;font-size:11px;font-weight:700;color:#fff;flex-shrink:0;width:38px;text-align:right">${fmtBig(pv)}</span>
           <span style="font-family:monospace;font-size:10px;color:${gc[dim]};flex-shrink:0;width:34px;text-align:right">${share.toFixed(1)}%</span>
           <span style="font-family:monospace;font-size:10px;color:${wow>=0?'#4ade80':'#f87171'};flex-shrink:0;width:40px;text-align:right">${pct(wow)}</span>
+          ${spark?`<span style="flex-shrink:0">${spark}</span>`:''}
         </div>`;
       });
     });
@@ -1140,16 +1397,18 @@ function renderReport(D){
       const rs=D.structural&&D.structural.reactionSplit&&D.structural.reactionSplit[dim];
       html += `<div class="card"><div class="ct" style="color:${gc[dim]}">Де відбувається взаємодія (${lbl.toUpperCase()})</div>`;
       if(rs){
-        const isCmt=rs.likesCommentsShare>=50, pctV=isCmt?rs.likesCommentsShare.toFixed(0):(100-rs.likesCommentsShare).toFixed(0);
-        const arena=isCmt?`коментарі (${pctV}% лайків), а не самі пости`:`пости (${pctV}% лайків), а не коментарі`;
+        const dom=rs.dominantSurface;
+        const domShare = ({'коментарі':rs.likesCommentsShare,'пости':rs.likesPostsShare,'треди':rs.likesThreadsShare})[dom.name]||0;
         html += `<div class="mr"><span class="ml">Likes на коментарях</span><span class="mv">${rs.likesCommentsShare.toFixed(0)}%</span></div>
+          <div class="mr"><span class="ml">Likes на постах</span><span class="mv">${rs.likesPostsShare.toFixed(0)}%</span></div>
+          ${rs.likesThreadsShare>=0.5?`<div class="mr"><span class="ml">Likes на тредах</span><span class="mv">${rs.likesThreadsShare.toFixed(0)}%</span></div>`:''}
           <div class="mr"><span class="ml">Dislikes на коментарях</span><span class="mv">${rs.dislikesCommentsShare.toFixed(0)}%</span></div>
           <div class="mr"><span class="ml">Likes на користувача</span><span class="mv">${rs.likesPerUser.toFixed(1)}×</span></div>
           <div class="mr"><span class="ml">Унікальних лайкерів</span><span class="mv">${fmtBig(rs.likingUsers)}</span></div>
           ${rs.pollVoters>0?`<div class="mr"><span class="ml">Унікальних голосуючих</span><span class="mv">${fmtBig(rs.pollVoters)}</span></div>`:''}
           <div style="display:flex;align-items:flex-start;gap:8px;margin-top:12px;background:#1c1a0e;border:1px solid #78350f;border-radius:8px;padding:10px 12px">
             <span style="color:#fbbf24;font-size:14px;flex-shrink:0">ℹ</span>
-            <span style="font-size:11px;color:#fde68a;line-height:1.4">Основна арена взаємодії — ${arena}</span>
+            <span style="font-size:11px;color:#fde68a;line-height:1.4">Основна арена взаємодії — ${dom.name} (${domShare.toFixed(0)}% лайків)</span>
           </div>`;
       } else {
         html += '<div style="color:#6b7280;font-size:12px">Немає даних</div>';
@@ -1189,8 +1448,11 @@ function renderReport(D){
     html += '<div class="g3">';
     gcArr.forEach(([dim,lbl])=>{
       const fs=D.structural&&D.structural.followSources&&D.structural.followSources[dim];
-      html += `<div class="card"><div class="ct" style="color:${gc[dim]}">Звідки приходять follows (${lbl.toUpperCase()})</div>
-        <div style="font-size:11px;color:#6b7280;margin-bottom:10px">${fmtBig(fs?fs.total:n(D.subs[dim]&&D.subs[dim].follows_total))} follows total</div>`;
+      const _subsDim = D.subs[dim]||{};
+      const _fwow = n(_subsDim.follows_wow_pct);
+      const _fwowStr = _fwow!==0 ? ` <span style="color:${_fwow>0?'#4ade80':'#f87171'};font-family:monospace">(${_fwow>0?'+':''}${_fwow.toFixed(1)}% WoW)</span>` : '';
+      html += `<div class="card"><div class="ct" style="color:${gc[dim]}">Звідки приходять follows (${lbl.toUpperCase()})</div><div style="font-size:10px;color:#6b7280;margin-top:-6px;margin-bottom:8px">підписки на теги/теми</div>
+        <div style="font-size:11px;color:#6b7280;margin-bottom:10px">${fmtBig(fs?fs.total:n(_subsDim.follows_total))} follows total${_fwowStr}</div>`;
       if(fs&&fs.sources.length){
         fs.sources.forEach(src=>{
           html += `<div style="margin:6px 0">
@@ -1210,9 +1472,9 @@ function renderReport(D){
     html += '</div>';
   }
 
-  // ── #25932 + #25933: Activation Funnel ──
+  // ── #25932 + #25933: Engagement Depth ──
   if(D.fnew || D.fwau){
-    html += '<div class="section-label">Activation Funnel</div>';
+    html += '<div class="section-label">Engagement Depth</div>';
     function convTableHTML(sectionTitle, rows){
       const thStyle = 'style="padding:6px 10px;text-align:right;font-size:11px;font-weight:500;color:#6b7280;text-transform:uppercase;letter-spacing:0.04em;border-bottom:0.5px solid #252836"';
       const thLeft = 'style="padding:6px 10px;text-align:left;font-size:11px;font-weight:500;color:#6b7280;text-transform:uppercase;letter-spacing:0.04em;border-bottom:0.5px solid #252836"';
@@ -1252,6 +1514,7 @@ function renderReport(D){
         {dim:'flagman', base:n(D.fnew.flagman&&D.fnew.flagman.installs), r:D.fnew.flagman},
         {dim:'web',     base:n(D.fnew.web&&D.fnew.web.installs),        r:D.fnew.web},
       ]);
+      html += `<div style="font-size:11px;color:#4b5563;margin-top:-6px;margin-bottom:12px;padding:0 2px">* Web "нові користувачі" — це перші візити з незнайомого браузера (cookie/localStorage), а не реєстрації акаунтів. Тому Reacted% низький: більшість вебових читачів не залоговані і не можуть ставити реакції.</div>`;
     }
     if(D.fwau){
       const week=D.fwau.clubs?D.fwau.clubs.week_str:'';
@@ -1261,17 +1524,6 @@ function renderReport(D){
         {dim:'web',     base:n(D.fwau.web&&D.fwau.web.waus),        r:D.fwau.web},
       ]);
     }
-  }
-
-  // ── DEEP ANALYSIS ──
-  if(D.deepAnalysis && D.deepAnalysis.length){
-    html += '<div class="section-label">Аналіз</div><div class="alerts-section">';
-    const _typeMap = {'#f87171':['red','🔴'],'#fbbf24':['amber','🟡'],'#4ade80':['green','🟢'],'#9ca3af':['amber','ℹ️']};
-    D.deepAnalysis.forEach(item=>{
-      const [cls,icon] = _typeMap[item.color]||['amber','ℹ️'];
-      html += `<div class="alert-row alert-${cls}"><span class="alert-icon">${icon}</span><div><b>${item.title}</b><br><span style="font-weight:400;opacity:0.9">${item.body}</span></div></div>`;
-    });
-    html += '</div>';
   }
 
   document.getElementById('report-body').innerHTML = html;
@@ -1311,7 +1563,10 @@ body{background:#0f1117;color:#e8eaf0;font-family:system-ui,sans-serif;font-size
 .alert-row{border-radius:8px;padding:9px 14px;font-size:12px;font-weight:500;display:flex;align-items:flex-start;gap:10px;margin-bottom:6px;line-height:1.5}
 .alert-red{background:#2a1515;border:1px solid #5a2020;color:#fca5a5}
 .alert-amber{background:#2a2010;border:1px solid #5a3a10;color:#fcd34d}
+.alert-gray{background:#1a1c22;border:1px solid #2a2d3a;color:#9ca3af}
 .alert-green{background:#152a15;border:1px solid #205a20;color:#86efac}
+.alert-separator{font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#4b5563;padding:6px 4px 2px;margin-top:4px}
+.alert-separator:first-child{margin-top:0}
 .section-label{font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#4b5563;margin:16px 0 8px;display:flex;align-items:center;gap:8px}
 .section-label::after{content:'';flex:1;height:0.5px;background:#1e2130}
 .clubs-table{width:100%;border-collapse:collapse;font-size:11px}
