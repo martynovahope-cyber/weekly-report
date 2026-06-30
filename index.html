@@ -611,7 +611,7 @@ function analyzeAll(){
     Object.keys(_flagPollMap).forEach(name=>{ flagPollTrends[name]=reactWeeks.map(w=>_flagPollMap[name][w]||0); });
     D.react = {
       clubs: top('Clubs')[0]||{}, flagman: top('Flagman')[0]||{}, web: top('Web')[0]||{},
-      clubApps: appRows(rows,'Clubs'), flagmanApps: appRows(rows,'Flagman'),
+      clubApps: appRows(rows,'Clubs'), flagmanApps: appRows(rows,'Flagman'), webApps: appRows(rows,'Web'),
       clubPollTrends, flagPollTrends,
       trends: {
         clubs_polls: metricTrend(weekSeries(rows,'dimension','Clubs'), 'poll_votes'),
