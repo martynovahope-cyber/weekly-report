@@ -733,14 +733,23 @@ function findStructuralInsights(D){
     };
   });
 
-  // 4. Retention cliff D0→D1 vs D1→D7 — per dimension
+  // 4. Retention cliff D0→D1→D7(→D14→D30 якщо є) — per dimension
   s.retentionCliff = {};
   dims.forEach(dim=>{
     const c = D.ret && D.ret[dim];
     if(!c || !n(c.d1_pct)) return;
     const d0 = n(c.d0_pct)||100, d1 = n(c.d1_pct), d7 = n(c.d7_pct);
+    const d14 = c.d14_pct!=null && c.d14_pct!=='' ? n(c.d14_pct) : null;
+    const d30 = c.d30_pct!=null && c.d30_pct!=='' ? n(c.d30_pct) : null;
     const dropD0D1 = d0 - d1, dropD1D7 = d1 - d7;
-    s.retentionCliff[dim] = { d0, d1, d7, dropD0D1, dropD1D7, steepest: dropD0D1>dropD1D7 ? 'D0→D1' : 'D1→D7' };
+    const dropD7D14 = d14!=null ? d7 - d14 : null;
+    const dropD14D30 = (d14!=null && d30!=null) ? d14 - d30 : null;
+    const drops = [['D0→D1',dropD0D1], ['D1→D7',dropD1D7]];
+    if(dropD7D14!=null) drops.push(['D7→D14',dropD7D14]);
+    if(dropD14D30!=null) drops.push(['D14→D30',dropD14D30]);
+    const steepest = drops.reduce((a,b)=> b[1]>a[1]?b:a)[0];
+    const maxDrop = Math.max(...drops.map(x=>x[1]));
+    s.retentionCliff[dim] = { d0, d1, d7, d14, d30, dropD0D1, dropD1D7, dropD7D14, dropD14D30, drops, steepest, maxDrop };
   });
 
   return s;
@@ -1052,13 +1061,14 @@ function generateAlerts(D){
   function platformOf(a){
     if(/\bWeb\b/i.test(a.text)) return 2;
     if(/\bFlagman\b/i.test(a.text)) return 1;
-    return 0;
+    return 0; // Clubs or general
   }
   alerts.sort((a,b)=>{
     const pd = platformOf(a)-platformOf(b);
     if(pd!==0) return pd;
     return (order[a.type]||2)-(order[b.type]||2);
   });
+  // Insert platform separators
   const platformLabels = ['Clubs','Flagman','Web'];
   const result = [];
   let lastPlatform = -1;
@@ -1249,19 +1259,14 @@ function renderReport(D){
     gcArr.forEach(([dim,lbl])=>{
       const rc = D.structural&&D.structural.retentionCliff&&D.structural.retentionCliff[dim];
       if(!rc){ html += `<div class="card"><div class="ct">Провал retention (${lbl})</div><div style="color:#6b7280;font-size:12px">Немає даних</div></div>`; return; }
-      const rd = D.ret&&D.ret[dim]||{};
-      const d1wow = n(rd.d1_wow_pp), d7wow = n(rd.d7_wow_pp);
-      const d1wowHtml = d1wow>0.05?`<span style="color:#4ade80;font-size:9px">+${d1wow.toFixed(1)}pp</span>`:d1wow<-0.05?`<span style="color:#f87171;font-size:9px">${d1wow.toFixed(1)}pp</span>`:`<span style="color:#6b7280;font-size:9px">±0pp</span>`;
-      const d7wowHtml = d7wow>0.05?`<span style="color:#4ade80;font-size:9px">+${d7wow.toFixed(1)}pp</span>`:d7wow<-0.05?`<span style="color:#f87171;font-size:9px">${d7wow.toFixed(1)}pp</span>`:`<span style="color:#6b7280;font-size:9px">±0pp</span>`;
-      const isRed=rc.dropD0D1>40, alertBg=isRed?'#2a1215':'#1c1208', alertBorder=isRed?'#7f1d1d':'#78350f', alertText=isRed?'#fca5a5':'#fde68a';
+      const isRed=rc.maxDrop>40, alertBg=isRed?'#2a1215':'#1c1208', alertBorder=isRed?'#7f1d1d':'#78350f', alertText=isRed?'#fca5a5':'#fde68a';
+      const dropsHtml = rc.drops.map(([label,val])=>
+        `<div class="mr"><span class="ml">${label}</span><span class="mv" style="color:#f87171">-${val.toFixed(1)}pp</span></div>`
+      ).join('');
       html += `<div class="card">
         <div class="ct" style="color:${gc[dim]}">Провал retention (${lbl})</div>
-        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px">
-          <div style="background:#1e2130;border-radius:8px;padding:9px 10px;text-align:center"><div style="font-size:10px;color:#6b7280;margin-bottom:4px">D0</div><div style="font-family:monospace;font-size:18px;font-weight:700;color:${gc[dim]}">${rc.d0.toFixed(0)}%</div></div>
-          <div style="background:#1e2130;border-radius:8px;padding:9px 10px;text-align:center"><div style="font-size:10px;color:#6b7280;margin-bottom:4px">D1 ${d1wowHtml}</div><div style="font-family:monospace;font-size:18px;font-weight:700;color:${rc.steepest==='D0→D1'?'#f87171':'#e8eaf0'}">${rc.d1.toFixed(0)}%</div></div>
-          <div style="background:#1e2130;border-radius:8px;padding:9px 10px;text-align:center"><div style="font-size:10px;color:#6b7280;margin-bottom:4px">D7 ${d7wowHtml}</div><div style="font-family:monospace;font-size:18px;font-weight:700;color:${rc.steepest==='D1→D7'?'#f87171':'#e8eaf0'}">${rc.d7.toFixed(0)}%</div></div>
-        </div>
-        <div style="background:${alertBg};border:1px solid ${alertBorder};border-radius:8px;padding:9px 12px;font-size:12px;color:${alertText};line-height:1.5">${(100-rc.d1).toFixed(0)}% не повертаються на наступний день — найгостріший момент ${rc.steepest}</div>
+        ${dropsHtml}
+        <div style="background:${alertBg};border:1px solid ${alertBorder};border-radius:8px;padding:9px 12px;margin-top:12px;font-size:12px;color:${alertText};line-height:1.5">${(100-rc.d1).toFixed(0)}% не повертаються на наступний день — найгостріший момент ${rc.steepest}</div>
         ${dim==='web'?`<div style="font-size:11px;color:#4b5563;margin-top:8px">* Web installs — це перші візити з незнайомого браузера (cookie), а не реєстрації. Низький retention для веба очікуваний: більшість читачів приходять з пошуку на одну статтю і не повертаються.</div>`:''}
       </div>`;
     });
