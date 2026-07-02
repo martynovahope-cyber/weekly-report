@@ -1242,11 +1242,12 @@ function renderReport(D){
     html += '<div class="card"><div class="ct">WAU Retention (активне утримання)</div>';
     gcArr.forEach(([dim,lbl])=>{
       const r=D.ret[dim]||{}, color=gc[dim], ret=n(r.retention_pct), topR=_topRetMap[dim];
+      const retTip = r.retained_this!=null && r.wau_prev!=null ? `${fmtBig(r.retained_this)} з ${fmtBig(r.wau_prev)} повернулись — ${fmt(r.retention_pct)}%` : `WAU Retention: ${fmt(r.retention_pct)}%`;
       html += `<div style="margin-bottom:14px">
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px">
           <span style="font-size:12px;font-weight:600;color:${color};width:56px;flex-shrink:0">${lbl}</span>
-          <div title="WAU Retention: ${fmt(r.retention_pct)}%" style="flex:1;background:#252836;border-radius:3px;height:6px;cursor:default"><div style="background:${color};border-radius:3px;height:6px;width:${Math.min(ret,100).toFixed(1)}%"></div></div>
-          <span title="WAU Retention: ${fmt(r.retention_pct)}%" style="font-family:monospace;font-size:13px;font-weight:700;color:#fff;flex-shrink:0;cursor:default">${fmt(r.retention_pct)}%</span>
+          <div title="${retTip}" style="flex:1;background:#252836;border-radius:3px;height:6px;cursor:default"><div style="background:${color};border-radius:3px;height:6px;width:${Math.min(ret,100).toFixed(1)}%"></div></div>
+          <span title="${retTip}" style="font-family:monospace;font-size:13px;font-weight:700;color:#fff;flex-shrink:0;cursor:default">${fmt(r.retention_pct)}%</span>
           <span title="${pp(r.retention_wow_pp)} WoW" style="font-family:monospace;font-size:11px;color:${n(r.retention_wow_pp)>=0?'#4ade80':'#f87171'};flex-shrink:0;cursor:default">${pp(r.retention_wow_pp)}</span>
         </div>
         ${topR?`<div style="font-size:10px;color:#6b7280;padding-left:66px">▴ топ: ${topR.app_name} ${fmt(topR.retention_pct)}%</div>`:''}
