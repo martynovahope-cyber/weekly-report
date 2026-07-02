@@ -1128,6 +1128,7 @@ function renderReport(D){
   const gcArr = [['clubs','Clubs'],['flagman','Flagman'],['web','Web']];
 
   let html = '';
+  html += `<div style="display:flex;align-items:center;gap:8px;background:#0e1a2e;border:1px solid #1e3a5f;border-radius:8px;padding:10px 16px;margin-bottom:16px;font-size:16px;color:#93c5fd">💡 Наведіть курсор на смужку, % або точку тренд-лінії — з'явиться підказка з точними цифрами.</div>`;
 
   // ── ALERTS ──
   if(D.alerts && D.alerts.length){
@@ -1234,9 +1235,9 @@ function renderReport(D){
       html += `<div style="margin-bottom:14px">
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px">
           <span style="font-size:12px;font-weight:600;color:${color};width:56px;flex-shrink:0">${lbl}</span>
-          <div style="flex:1;background:#252836;border-radius:3px;height:6px"><div style="background:${color};border-radius:3px;height:6px;width:${Math.min(ret,100).toFixed(1)}%"></div></div>
-          <span style="font-family:monospace;font-size:13px;font-weight:700;color:#fff;flex-shrink:0">${fmt(r.retention_pct)}%</span>
-          <span style="font-family:monospace;font-size:11px;color:${n(r.retention_wow_pp)>=0?'#4ade80':'#f87171'};flex-shrink:0">${pp(r.retention_wow_pp)}</span>
+          <div title="WAU Retention: ${fmt(r.retention_pct)}%" style="flex:1;background:#252836;border-radius:3px;height:6px;cursor:default"><div style="background:${color};border-radius:3px;height:6px;width:${Math.min(ret,100).toFixed(1)}%"></div></div>
+          <span title="WAU Retention: ${fmt(r.retention_pct)}%" style="font-family:monospace;font-size:13px;font-weight:700;color:#fff;flex-shrink:0;cursor:default">${fmt(r.retention_pct)}%</span>
+          <span title="${pp(r.retention_wow_pp)} WoW" style="font-family:monospace;font-size:11px;color:${n(r.retention_wow_pp)>=0?'#4ade80':'#f87171'};flex-shrink:0;cursor:default">${pp(r.retention_wow_pp)}</span>
         </div>
         ${topR?`<div style="font-size:10px;color:#6b7280;padding-left:66px">▴ топ: ${topR.app_name} ${fmt(topR.retention_pct)}%</div>`:''}
       </div>`;
@@ -1456,8 +1457,8 @@ function renderReport(D){
       if(fs&&fs.sources.length){
         fs.sources.forEach(src=>{
           html += `<div style="margin:6px 0">
-            <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:2px"><span style="color:#9ca3af">${src.label}</span><span style="font-family:monospace;color:#e8eaf0">${src.pct.toFixed(1)}%</span></div>
-            <div style="background:#1e2130;border-radius:3px;height:6px;overflow:hidden"><div style="height:100%;border-radius:3px;width:${Math.min(src.pct,100)}%;background:${gc[dim]}"></div></div>
+            <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:2px"><span style="color:#9ca3af">${src.label}</span><span title="${fmtBig(src.val)} follows (${src.pct.toFixed(1)}%)" style="font-family:monospace;color:#e8eaf0;cursor:default">${src.pct.toFixed(1)}%</span></div>
+            <div title="${src.label}: ${fmtBig(src.val)} follows (${src.pct.toFixed(1)}%)" style="background:#1e2130;border-radius:3px;height:6px;overflow:hidden;cursor:default"><div style="height:100%;border-radius:3px;width:${Math.min(src.pct,100)}%;background:${gc[dim]}"></div></div>
           </div>`;
         });
         html += `<div style="display:flex;align-items:flex-start;gap:8px;margin-top:10px;background:#1c1a0e;border:1px solid #78350f;border-radius:8px;padding:10px 12px">
@@ -1485,16 +1486,19 @@ function renderReport(D){
         const viewedPct=n(r.viewed_pct), reactedPct=n(r.reacted_pct), reactedWow=n(r.reacted_wow_pp);
         const commentedPct=n(r.commented_pct), commentedWow=n(r.commented_wow_pp), created=n(r.created_content_users);
         const reactBarW=Math.round(reactedPct/100*60), viewBarW=Math.round(viewedPct/100*60);
+        const viewedAbs=base>0?Math.round(base*viewedPct/100):null;
+        const reactedAbs=base>0?Math.round(base*reactedPct/100):null;
+        const commentedAbs=base>0?Math.round(base*commentedPct/100):null;
         const reactWowHtml=reactedWow>0.05?`<span style="color:#4ade80;font-size:11px">+${reactedWow.toFixed(1)}pp</span>`:reactedWow<-0.05?`<span style="color:#f87171;font-size:11px">${reactedWow.toFixed(1)}pp</span>`:`<span style="color:#6b7280;font-size:11px">±0pp</span>`;
         const commWowHtml=commentedWow>0.05?`<span style="color:#4ade80;font-size:11px">+${commentedWow.toFixed(1)}pp</span>`:commentedWow<-0.05?`<span style="color:#f87171;font-size:11px">${commentedWow.toFixed(1)}pp</span>`:`<span style="color:#6b7280;font-size:11px">±0pp</span>`;
         const tdS='style="padding:9px 10px;text-align:right;border-bottom:0.5px solid #1e2130;color:#e8eaf0"';
         tbody += `<tr>
           <td style="padding:9px 10px;text-align:left;border-bottom:0.5px solid #1e2130;font-weight:500;color:#e8eaf0"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${dotColor};margin-right:6px"></span>${dim.charAt(0).toUpperCase()+dim.slice(1)}</td>
           <td ${tdS}>${fmtBig(base)}</td>
-          <td ${tdS}><div style="display:flex;align-items:center;gap:6px;justify-content:flex-end"><div style="height:6px;border-radius:3px;width:${viewBarW}px;background:${dotColor};opacity:0.4;min-width:2px"></div><span style="min-width:38px;text-align:right">${viewedPct.toFixed(0)}%</span></div></td>
-          <td ${tdS}><div style="display:flex;align-items:center;gap:6px;justify-content:flex-end"><div style="height:6px;border-radius:3px;width:${Math.max(reactBarW,2)}px;background:${dotColor};min-width:2px"></div><span style="min-width:38px;text-align:right">${reactedPct<1?reactedPct.toFixed(1):reactedPct.toFixed(0)}%</span></div></td>
+          <td title="${viewedAbs!==null?fmtBig(viewedAbs)+' users':''}${viewedPct.toFixed(1)}%" ${tdS}><div style="display:flex;align-items:center;gap:6px;justify-content:flex-end;cursor:default"><div style="height:6px;border-radius:3px;width:${viewBarW}px;background:${dotColor};opacity:0.4;min-width:2px"></div><span style="min-width:38px;text-align:right">${viewedPct.toFixed(0)}%</span></div></td>
+          <td title="${reactedAbs!==null?fmtBig(reactedAbs)+' users':''}${reactedPct<1?reactedPct.toFixed(1):reactedPct.toFixed(0)}%" ${tdS}><div style="display:flex;align-items:center;gap:6px;justify-content:flex-end;cursor:default"><div style="height:6px;border-radius:3px;width:${Math.max(reactBarW,2)}px;background:${dotColor};min-width:2px"></div><span style="min-width:38px;text-align:right">${reactedPct<1?reactedPct.toFixed(1):reactedPct.toFixed(0)}%</span></div></td>
           <td ${tdS}>${reactWowHtml}</td>
-          <td ${tdS}>${commentedPct<1?commentedPct.toFixed(1):commentedPct.toFixed(0)}%</td>
+          <td title="${commentedAbs!==null?fmtBig(commentedAbs)+' users':''}${commentedPct<1?commentedPct.toFixed(1):commentedPct.toFixed(0)}%" style="padding:9px 10px;text-align:right;border-bottom:0.5px solid #1e2130;color:#e8eaf0;cursor:default">${commentedPct<1?commentedPct.toFixed(1):commentedPct.toFixed(0)}%</td>
           <td ${tdS}>${commWowHtml}</td>
           <td ${tdS}><span style="font-family:monospace;font-size:12px;color:#6b7280">${created}</span></td>
         </tr>`;
@@ -1587,6 +1591,7 @@ body{background:#0f1117;color:#e8eaf0;font-family:system-ui,sans-serif;font-size
 <h1 style="font-size:20px;font-weight:700;color:#fff">Огляд тижня</h1>
 <span style="font-size:13px;color:#6b7280">${weekStr}</span>
 </div>
+<div style="display:flex;align-items:center;gap:8px;background:#0e1a2e;border:1px solid #1e3a5f;border-radius:8px;padding:10px 16px;margin-bottom:16px;font-size:16px;color:#93c5fd">💡 Наведіть курсор на смужку, % або точку тренд-лінії — з'явиться підказка з точними цифрами.</div>
 ${body}
 <div style="margin-top:20px;padding-top:12px;border-top:1px solid #1e2130;font-size:10px;color:#374151;display:flex;justify-content:space-between">
 <span>Community Weekly Report · Redash #651</span>
