@@ -458,59 +458,79 @@ function generateDeepAnalysis(D){
     }
   }
 
-  // 2. One sub-app drives all dimension growth
-  if(D.eng && D.eng.flagmanApps && D.eng.flagmanApps.length>0){
-    const apps = D.eng.flagmanApps;
-    const dimGrowth = n(D.eng.flagman.wau) - n(D.eng.flagman.wau_prev);
-    if(dimGrowth > 0){
-      const sorted = [...apps].sort((a,b)=>(n(b.wau)-n(b.wau_prev))-(n(a.wau)-n(a.wau_prev)));
-      const top = sorted[0];
-      const topGrowth = n(top.wau) - n(top.wau_prev);
-      const share = topGrowth/dimGrowth*100;
-      if(share > 75 && n(top.wau_wow_pct) > 40){
-        items.push({color:'#fbbf24', title:`Flagman: ріст майже повністю з ${top.app_name}`,
-          body:`${share.toFixed(0)}% приросту Flagman WAU (+${fmtBig(dimGrowth)}) забезпечує один застосунок — ${top.app_name} (+${fmtBig(topGrowth)}, ${pct(top.wau_wow_pct)}). Зростання платформи зараз залежить від одного джерела. Важливо перевірити: це органіка чи кампанія, і чи залишаться ці юзери через 2–3 тижні.`});
-      }
+  // 2. One sub-app drives all dimension growth (all platforms)
+  [
+    {dim:'clubs',   lbl:'Clubs',   appsKey:'clubApps'},
+    {dim:'flagman', lbl:'Flagman', appsKey:'flagmanApps'},
+    {dim:'web',     lbl:'Web',     appsKey:'webApps'},
+  ].forEach(({dim, lbl, appsKey})=>{
+    if(!D.eng || !D.eng[appsKey] || !D.eng[appsKey].length) return;
+    const apps = D.eng[appsKey];
+    const dimGrowth = n(D.eng[dim].wau) - n(D.eng[dim].wau_prev);
+    if(dimGrowth <= 0) return;
+    const sorted = [...apps].sort((a,b)=>(n(b.wau)-n(b.wau_prev))-(n(a.wau)-n(a.wau_prev)));
+    const top = sorted[0];
+    const topGrowth = n(top.wau) - n(top.wau_prev);
+    const topGrowthPct = n(top.wau_prev) > 0 ? topGrowth / n(top.wau_prev) * 100 : null;
+    const share = topGrowth/dimGrowth*100;
+    if(share > 75 && topGrowthPct !== null && topGrowthPct > 40){
+      items.push({color:'#fbbf24', title:`${lbl}: ріст майже повністю з ${top.app_name}`,
+        body:`${share.toFixed(0)}% приросту ${lbl} WAU (+${fmtBig(dimGrowth)}) забезпечує один застосунок — ${top.app_name} (+${fmtBig(topGrowth)}, +${topGrowthPct.toFixed(1)}% WoW). Зростання платформи зараз залежить від одного джерела. Важливо перевірити: це органіка чи кампанія, і чи залишаться ці юзери через 2–3 тижні.`});
     }
-  }
+  });
 
-  // 3. Poll votes: returning to baseline after event spike
-  if(D.react && D.react.clubs){
-    const c = D.react.clubs;
+  // 3. Poll votes: returning to baseline after event spike (all platforms)
+  [
+    {dim:'clubs',   lbl:'Clubs'},
+    {dim:'flagman', lbl:'Flagman'},
+    {dim:'web',     lbl:'Web'},
+  ].forEach(({dim, lbl})=>{
+    if(!D.react || !D.react[dim]) return;
+    const c = D.react[dim];
     const pollWow = n(c.polls_wow_pct);
     const pollCurr = n(c.poll_votes);
     const pollPrev = n(c.poll_votes_prev);
     if(pollWow < -50 && pollPrev > pollCurr*3){
-      items.push({color:'#9ca3af', title:'Poll votes: повернення до норми після події',
-        body:`Падіння на ${pct(pollWow)} (${fmtBig(pollPrev)} → ${fmtBig(pollCurr)}) — але попередній тиждень сам по собі був аномально високим, ймовірно через великий матч або подію. Поточні ${fmtBig(pollCurr)} — це нормальна базова активність, а не зниження залученості. Alert по цій метриці цього тижня не є тривожним.`});
+      items.push({color:'#9ca3af', title:`${lbl}: Poll votes — повернення до норми після події`,
+        body:`Падіння на ${pct(pollWow)} (${fmtBig(pollPrev)} → ${fmtBig(pollCurr)}) — але попередній тиждень сам по собі був аномально високим, ймовірно через великий матч або подію. Поточні ${fmtBig(pollCurr)} — це нормальна базова активність, а не зниження залученості.`});
     }
-  }
+  });
 
-  // 4. WAU stable but per-user engagement falling
-  if(D.eng && D.ugc && D.react && D.eng.clubs && D.ugc.clubs && D.react.clubs){
-    const wauWow = n(D.eng.clubs.wau_wow_pct);
-    const commWow = n(D.ugc.clubs.comments_wow_pct);
-    const likesWow = n(D.react.clubs.likes_wow_pct);
+  // 4. WAU stable but per-user engagement falling (all platforms)
+  [
+    {dim:'clubs',   lbl:'Clubs'},
+    {dim:'flagman', lbl:'Flagman'},
+    {dim:'web',     lbl:'Web'},
+  ].forEach(({dim, lbl})=>{
+    if(!D.eng || !D.ugc || !D.react) return;
+    if(!D.eng[dim] || !D.ugc[dim] || !D.react[dim]) return;
+    const wauWow = n(D.eng[dim].wau_wow_pct);
+    const commWow = n(D.ugc[dim].comments_wow_pct);
+    const likesWow = n(D.react[dim].likes_wow_pct);
     if(Math.abs(wauWow)<3 && commWow<-8 && likesWow<-8){
-      const commPer100 = (n(D.ugc.clubs.total_comments)/n(D.eng.clubs.wau)*100).toFixed(1);
-      items.push({color:'#f87171', title:'Clubs: аудиторія є — залученість падає',
+      const commPer100 = n(D.eng[dim].wau)>0 ? (n(D.ugc[dim].total_comments)/n(D.eng[dim].wau)*100).toFixed(1) : '—';
+      items.push({color:'#f87171', title:`${lbl}: аудиторія є — залученість падає`,
         body:`WAU майже не змінився (${pct(wauWow)}), але comments ${pct(commWow)}, likes ${pct(likesWow)}. Люди заходять, але менше взаємодіють. Comments на 100 WAU: ${commPer100}. Можливі причини: якість контенту знизилась, алгоритм фіду змінився, або активні юзери замінились пасивнішими новими.`});
     }
-  }
+  });
 
-  // 5. Retention dilution from rapid WAU growth
-  if(D.ret && D.ret.trends && D.eng && D.eng.trends){
-    const retT = D.ret.trends.flagman_retention.filter(v=>v!=null);
-    const wauT = D.eng.trends.flagman_wau.filter(v=>v!=null);
-    if(retT.length>=2 && wauT.length>=2){
-      const retDelta = retT[retT.length-1] - retT[0];
-      const wauGrowth = (wauT[wauT.length-1]-wauT[0])/wauT[0]*100;
-      if(wauGrowth > 20 && retDelta < -1.5){
-        items.push({color:'#fbbf24', title:'Flagman: WAU росте, retention знижується',
-          body:`WAU Flagman виріс на ${pct(wauGrowth)} за ${wauT.length} тижні, але WAU retention впав з ${retT[0]}% до ${retT[retT.length-1]}% (${pp(retDelta)}). Це класичний ефект розводнення при швидкому рості — нові юзери утримуються гірше ніж стара база. Треба дивитись retention нових когорт окремо, а не тільки агрегат.`});
-      }
+  // 5. Retention dilution from rapid WAU growth (all platforms)
+  [
+    {dim:'clubs',   lbl:'Clubs',   retKey:'clubs_retention',   wauKey:'clubs_wau'},
+    {dim:'flagman', lbl:'Flagman', retKey:'flagman_retention', wauKey:'flagman_wau'},
+    {dim:'web',     lbl:'Web',     retKey:'web_retention',     wauKey:'web_wau'},
+  ].forEach(({lbl, retKey, wauKey})=>{
+    if(!D.ret || !D.ret.trends || !D.eng || !D.eng.trends) return;
+    const retT = (D.ret.trends[retKey]||[]).filter(v=>v!=null);
+    const wauT = (D.eng.trends[wauKey]||[]).filter(v=>v!=null);
+    if(retT.length<2 || wauT.length<2) return;
+    const retDelta = retT[retT.length-1] - retT[0];
+    const wauGrowth = (wauT[wauT.length-1]-wauT[0])/wauT[0]*100;
+    if(wauGrowth > 20 && retDelta < -1.5){
+      items.push({color:'#fbbf24', title:`${lbl}: WAU росте, retention знижується`,
+        body:`WAU ${lbl} виріс на ${pct(wauGrowth)} за ${wauT.length} тижні, але WAU retention впав з ${retT[0]}% до ${retT[retT.length-1]}% (${pp(retDelta)}). Це класичний ефект розводнення при швидкому рості — нові юзери утримуються гірше ніж стара база. Треба дивитись retention нових когорт окремо, а не тільки агрегат.`});
     }
-  }
+  });
 
 
 
@@ -955,12 +975,6 @@ function generateAlerts(D){
       alerts.push({type:'gray', text:`Clubs likes поступово знижуються ${likesStreak.weeksInARow+1}-й тиждень поспіль${mag}`});
     }
 
-    const dislikesPostsStreak = streak(t.clubs_dislikes_posts);
-    if(dislikesPostsStreak.weeksInARow>=2 && dislikesPostsStreak.direction>0){
-      const rp = streakRelPct(t.clubs_dislikes_posts, dislikesPostsStreak);
-      const mag = rp!=null ? ` (+${rp.toFixed(1)}% за ${dislikesPostsStreak.weeksInARow+1} тижні)` : '';
-      alerts.push({type:'red', text:`Clubs dislikes на постах ростуть ${dislikesPostsStreak.weeksInARow+1}-й тиждень поспіль${mag} — варто перевірити якість контенту`});
-    }
 
     const pollsStreak = streak(t.clubs_polls);
     if(pollsStreak.weeksInARow>=2 && pollsStreak.direction>0){
