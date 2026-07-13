@@ -1154,28 +1154,6 @@ function renderReport(D){
   let html = '';
   html += `<div style="display:flex;align-items:center;gap:8px;background:#0e1a2e;border:1px solid #1e3a5f;border-radius:8px;padding:10px 16px;margin-bottom:16px;font-size:16px;color:#93c5fd">💡 Наведіть курсор на графіки та бари, щоб побачити точні числові значення у tooltip.</div>`;
 
-  // ── ALERTS ──
-  if(D.alerts && D.alerts.length){
-    html += '<div class="section-label">Критичні зміни</div><div class="alerts-section">';
-    D.alerts.forEach(a=>{
-      if(a.type==='separator'){ html += `<div class="alert-separator">${a.text}</div>`; return; }
-      const icon = a.type==='red'?'🔴':a.type==='green'?'🟢':'🟡';
-      html += `<div class="alert-row alert-${a.type}"><span class="alert-icon">${icon}</span>${a.text}</div>`;
-    });
-    html += '</div>';
-  }
-
-  // ── DEEP ANALYSIS (after alerts) ──
-  if(D.deepAnalysis && D.deepAnalysis.length){
-    html += '<div class="section-label">Аналіз</div><div class="alerts-section">';
-    const _typeMap = {'#f87171':['red','🔴'],'#fbbf24':['amber','🟡'],'#4ade80':['green','🟢'],'#9ca3af':['amber','ℹ️']};
-    D.deepAnalysis.forEach(item=>{
-      const [cls,icon] = _typeMap[item.color]||['amber','🟡'];
-      html += `<div class="alert-row alert-${cls}"><span class="alert-icon">${icon}</span><div><b>${item.title}</b><br><span style="font-weight:400;opacity:0.9">${item.body}</span></div></div>`;
-    });
-    html += '</div>';
-  }
-
   // ── #25925: Engagement ──
   if(D.eng){
     const appsKeyMap = {clubs:'clubApps', flagman:'flagmanApps', web:'webApps'};
@@ -1548,6 +1526,28 @@ function renderReport(D){
         {dim:'web',     base:n(D.fwau.web&&D.fwau.web.waus),        r:D.fwau.web},
       ]);
     }
+  }
+
+  // ── ALERTS ──
+  if(D.alerts && D.alerts.length){
+    html += '<div class="section-label">Критичні зміни</div><div class="alerts-section">';
+    D.alerts.forEach(a=>{
+      if(a.type==='separator'){ html += `<div class="alert-separator">${a.text}</div>`; return; }
+      const icon = a.type==='red'?'🔴':a.type==='green'?'🟢':'🟡';
+      html += `<div class="alert-row alert-${a.type}"><span class="alert-icon">${icon}</span>${a.text}</div>`;
+    });
+    html += '</div>';
+  }
+
+  // ── DEEP ANALYSIS ──
+  if(D.deepAnalysis && D.deepAnalysis.length){
+    html += '<div class="section-label">Аналіз</div><div class="alerts-section">';
+    const _typeMap = {'#f87171':['red','🔴'],'#fbbf24':['amber','🟡'],'#4ade80':['green','🟢'],'#9ca3af':['amber','ℹ️']};
+    D.deepAnalysis.forEach(item=>{
+      const [cls,icon] = _typeMap[item.color]||['amber','🟡'];
+      html += `<div class="alert-row alert-${cls}"><span class="alert-icon">${icon}</span><div><b>${item.title}</b><br><span style="font-weight:400;opacity:0.9">${item.body}</span></div></div>`;
+    });
+    html += '</div>';
   }
 
   document.getElementById('report-body').innerHTML = html;
