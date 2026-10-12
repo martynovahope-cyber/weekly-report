@@ -6,7 +6,7 @@
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:#0f1117;color:#e8eaf0;font-family:system-ui,sans-serif;font-size:13px;min-height:100vh}
-.app{max-width:1200px;margin:0 auto;padding:24px 20px}
+.app{max-width:1360px;margin:0 auto;padding:24px 20px}
 
 /* Upload screen */
 .upload-screen{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:80vh;gap:24px}
@@ -34,7 +34,9 @@ input[type=file]{display:none}
 .report-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;padding-bottom:16px;border-bottom:1px solid #1e2130}
 .report-title{font-size:20px;font-weight:700;color:#fff}
 .report-week{font-size:13px;color:#6b7280;margin-top:2px}
-.header-actions{display:flex;gap:8px}
+.header-actions{display:flex;gap:8px;align-items:center}
+.week-select{background:#161921;border:1px solid #252836;color:#e8eaf0;border-radius:8px;padding:7px 10px;font-size:12px;font-family:inherit;cursor:pointer}
+.week-select:hover{border-color:#3a3f55}
 .btn-sec{background:#161921;border:0.5px solid #2a2d3a;border-radius:8px;padding:8px 16px;font-size:12px;color:#d1d5db;cursor:pointer;display:flex;align-items:center;gap:6px}
 .btn-sec:hover{background:#1e2130}
 .btn-pri{background:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:12px;font-weight:600;color:#0f1117;cursor:pointer;display:flex;align-items:center;gap:6px}
@@ -45,7 +47,7 @@ input[type=file]{display:none}
 /* Grid layouts */
 .g3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:12px}
 .g2{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:12px}
-.g4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:12px}
+.g4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:12px}
 .g32{display:grid;grid-template-columns:2fr 1fr;gap:12px;margin-bottom:12px}
 .g23{display:grid;grid-template-columns:1fr 2fr;gap:12px;margin-bottom:12px}
 
@@ -157,21 +159,31 @@ input[type=file]{display:none}
 .drill-trigger:hover{opacity:0.72}
 .drill-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:1000;align-items:center;justify-content:center;padding:24px}
 .drill-overlay.open{display:flex}
-.drill-modal{background:#161921;border:1px solid #252836;border-radius:12px;width:440px;max-width:100%;max-height:80vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,0.5)}
+.drill-modal{background:#161921;border:1px solid #252836;border-radius:12px;width:720px;max-width:100%;max-height:80vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,0.5)}
 .drill-header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 16px;border-bottom:1px solid #252836;flex-shrink:0}
 .drill-title{font-size:13px;font-weight:600;color:#fff}
 .drill-close{background:none;border:none;color:#6b7280;font-size:14px;cursor:pointer;padding:4px 8px;border-radius:6px;line-height:1}
 .drill-close:hover{background:#1e2130;color:#fff}
-.drill-body{overflow-y:auto;padding:6px 16px 14px}
+.drill-body{overflow-y:auto;overflow-x:hidden;padding:6px 16px 14px}
 .drill-row{display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid #1a1d27;font-size:12px}
 .drill-row:last-child{border-bottom:none}
 .drill-rank{color:#6b7280;font-size:10px;width:16px;flex-shrink:0}
 .drill-name{flex:1;color:#e8eaf0;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.drill-val{font-family:'Courier New',monospace;font-weight:700;color:#fff;flex-shrink:0}
+.drill-val{font-family:'Courier New',monospace;font-weight:700;color:#fff;flex-shrink:0;min-width:64px;text-align:right}
 .drill-wow{font-family:'Courier New',monospace;font-size:11px;flex-shrink:0;width:58px;text-align:right}
 .drill-share{font-family:'Courier New',monospace;font-size:11px;color:#6b7280;flex-shrink:0;width:40px;text-align:right}
+.drill-sub{display:block;font-size:9px;margin-top:1px}
+.drill-sess{font-family:'Courier New',monospace;font-size:11px;color:#9ca3af;flex-shrink:0;width:56px;text-align:right}
+.drill-spu{font-family:'Courier New',monospace;font-size:11px;color:#9ca3af;flex-shrink:0;width:64px;text-align:right}
+.drill-head{position:sticky;top:0;background:#161921;z-index:1}
+.drill-head span{font-family:inherit!important;font-size:10px!important;font-weight:500!important;color:#6b7280!important;text-transform:uppercase;letter-spacing:0;white-space:nowrap}
 .drill-empty{color:#6b7280;font-size:12px;padding:12px 0}
-
+.drill-head [data-sort]{cursor:pointer;user-select:none}
+.drill-head [data-sort]:hover{color:#e8eaf0!important}
+.drill-head .drill-sort{color:#e8eaf0!important}
+.drill-total{background:#1e2130;border-radius:6px;padding-left:6px;padding-right:6px;margin:4px -6px}
+.drill-total .drill-name{color:#fff;font-weight:600}
+.drill-low{opacity:.45}
 @media print{
   *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
   .upload-screen{display:none!important}
@@ -194,9 +206,9 @@ input[type=file]{display:none}
   <div class="upload-zone" id="drop-zone" onclick="document.getElementById('csv-input').click()">
     <div class="upload-icon">📂</div>
     <h2>Завантажте CSV файли з Redash</h2>
-    <p>Можна перетягнути всі файли одразу — скільки завгодно тижнів<br>
+    <p>Можна перетягнути всі файли одразу або zip-архів — скільки завгодно тижнів<br>
     Система сама розпізнає тип звіту і тиждень, об'єднає однакові типи разом і побудує тренд</p>
-    <input type="file" id="csv-input" multiple accept=".csv" onchange="handleFiles(this.files)">
+    <input type="file" id="csv-input" multiple accept=".csv,.zip" onchange="handleFiles(this.files)">
   </div>
 
   <div class="file-list" id="file-list">
@@ -208,6 +220,7 @@ input[type=file]{display:none}
     <div class="file-item" id="fi-funnel-new"><div class="file-dot missing" id="fd-funnel-new"></div><span class="file-name">Weekly_Engagement_Depth_New_users</span><span class="file-status missing" id="fs-funnel-new">очікується</span></div>
     <div class="file-item" id="fi-funnel-wau"><div class="file-dot missing" id="fd-funnel-wau"></div><span class="file-name">Weekly_Engagement_Depth_Active_Users_(WAU)</span><span class="file-status missing" id="fs-funnel-wau">очікується</span></div>
     <div class="file-item" id="fi-active"><div class="file-dot missing" id="fd-active"></div><span class="file-name">Weekly_Active_Audience</span><span class="file-status missing" id="fs-active">очікується</span></div>
+    <div class="file-item" id="fi-sessions"><div class="file-dot missing" id="fd-sessions"></div><span class="file-name">Weekly_Sessions (query 12169)</span><span class="file-status missing" id="fs-sessions">очікується</span></div>
   </div>
 
   <button class="generate-btn" id="gen-btn" disabled onclick="buildReport()">Генерувати звіт →</button>
@@ -221,6 +234,7 @@ input[type=file]{display:none}
       <div class="report-week" id="r-week"></div>
     </div>
     <div class="header-actions">
+      <select class="week-select" id="week-select" title="Побудувати звіт так, ніби цей тиждень — останній (порівняння, тренди й стріки — лише по даних до нього включно)" onchange="selectReportWeek(this.value)" style="display:none"></select>
       <button class="btn-back" onclick="showUpload()">← Нові файли</button>
       <button class="btn-sec" onclick="downloadReport()">⬇ Завантажити HTML</button>
       <button class="btn-sec" onclick="window.print()">⬇ Завантажити PDF</button>
@@ -247,6 +261,10 @@ input[type=file]{display:none}
 
 <script>
 // ── CSV Parser ──────────────────────────────────────────
+// Display names for products renamed after the Redash queries were built: the CSVs keep the old app_name,
+// the report shows the current one. Applied once at parse time, so every section, drill and alert agrees.
+const APP_RENAMES = { 'Tribuna INT': 'Football XTRA' };
+
 function parseCSV(text){
   const lines = text.replace(/\r/g,'').split('\n').filter(l=>l.trim());
   const headers = lines[0].split(',');
@@ -254,6 +272,7 @@ function parseCSV(text){
     const vals = line.split(',');
     const obj = {};
     headers.forEach((h,i)=>{ obj[h.trim()] = (vals[i]||'').trim(); });
+    if(APP_RENAMES[obj.app_name]) obj.app_name = APP_RENAMES[obj.app_name];
     return obj;
   });
 }
@@ -270,49 +289,171 @@ function pp(v){ const num=parseFloat(v)||0; const s=num>=0?'+':''; return s+num.
 function colorClass(v){ const num=parseFloat(v)||0; if(num>0) return 'up'; if(num<0) return 'dn'; return 'neu'; }
 function arrow(v){ const num=parseFloat(v)||0; if(num>0) return '↑'; if(num<0) return '↓'; return '→'; }
 
-// ── Drill-down modal: click any group-level value to see the same metric per-app, descending ──
-// rows: array of per-app row objects (already filtered to one group), each with `app_name` + CSV columns.
-// valueField: CSV column name to sort/display by. opts.wowField: CSV column for the WoW delta (optional).
-// opts.isPP: format wow as percentage-points (+1.2pp) instead of relative % (+1.2%). opts.isPct: append '%' to the value itself.
+// ── Drill-down modal: click any group-level value to see the same metric per-app ──
+// NOTE: this block is copied verbatim into downloadReport()'s exported file, which embeds it inside a JS template
+// literal — so it must stay free of backticks, template placeholders and backslashes (plain string concatenation only).
+// openDrill(title, groupLabel, rows, valueField, opts):
+//   rows: per-app rows of one group (a window.reportData.<section>.<group>Apps array); valueField: CSV column or row=>number.
+//   opts.wowField: column with a ready WoW; opts.prevField: previous-week column (or row=>number) to compute WoW;
+//   opts.isPP: WoW in percentage points; opts.isPct: value is a percentage; opts.suffix: text after the value (e.g. '×').
+// Features: "Разом" group row on top, sortable columns (click header; session columns cycle value↓ value↑ WoW↓ WoW↑),
+// sessions from 12169 (reportData.sess) with Android/iOS split, small apps (<1000 WAU) dimmed.
+var DRILL_APPS_TO_GROUP = {clubApps: 'clubs', flagmanApps: 'flagman', leagueApps: 'league', webApps: 'web'};
+var DRILL_LOW_WAU = 1000;
+var _drill = null;
+
 function openDrill(title, groupLabel, rows, valueField, opts){
-  opts = opts || {};
-  // valueField is usually a CSV column name; pass a function(row)=>number instead for computed ratios (e.g. likes/liking_users).
-  const getVal = typeof valueField === 'function' ? valueField : (r)=>n(r[valueField]);
-  const list = (rows||[]).filter(r=>r && r.app_name).slice().sort((a,b)=>getVal(b)-getVal(a));
-  // Share-of-group only makes sense for additive counts (WAU, sessions, likes...), not for percentages or computed ratios.
-  const showShare = opts.showShare!=null ? opts.showShare : (!opts.isPct && typeof valueField !== 'function');
-  const shareTotal = showShare ? list.reduce((s,r)=>s+getVal(r),0) : 0;
-  document.getElementById('drillTitle').textContent = groupLabel ? title+' — '+groupLabel : title;
-  const body = document.getElementById('drillBody');
-  if(!list.length){
-    body.innerHTML = '<div class="drill-empty">Немає даних по апках</div>';
-  } else {
-    body.innerHTML = list.map((r,i)=>{
-      const raw = getVal(r);
-      const val = opts.suffix ? raw.toFixed(1)+opts.suffix : opts.isPct ? fmt(raw)+'%' : fmtBig(raw);
-      const shareHtml = (showShare && shareTotal>0) ? `<span class="drill-share">${(raw/shareTotal*100).toFixed(0)}%</span>` : '';
-      let wowHtml = '';
-      let w = null;
-      if(opts.wowField && r[opts.wowField]!=null && r[opts.wowField]!==''){
-        w = n(r[opts.wowField]);
-      } else if(opts.prevField){
-        const prevRaw = typeof opts.prevField === 'function' ? opts.prevField(r) : r[opts.prevField];
-        if(prevRaw!=null && prevRaw!==''){
-          const prev = n(prevRaw);
-          if(prev>0) w = (raw-prev)/prev*100;
-        }
-      }
-      if(w!=null){
-        const wowStr = opts.isPP ? (w>=0?'+':'')+w.toFixed(1)+'pp' : pct(w);
-        wowHtml = `<span class="drill-wow" style="color:${w>=0?'#4ade80':'#f87171'}">${wowStr}</span>`;
-      }
-      return `<div class="drill-row"><span class="drill-rank">${i+1}.</span><span class="drill-name">${r.app_name}</span><span class="drill-val">${val}</span>${shareHtml}${wowHtml}</div>`;
-    }).join('');
-  }
+  _drill = {title: title, groupLabel: groupLabel, rows: rows || [], valueField: valueField, opts: opts || {}, key: 'val', mode: 0};
+  document.getElementById('drillTitle').textContent = groupLabel ? title + ' — ' + groupLabel : title;
+  renderDrill();
   document.getElementById('drillOverlay').classList.add('open');
 }
+
+function drillSort(key){
+  if(!_drill) return;
+  var cycle = ['sess', 'spu', 'spuA', 'spuI'].indexOf(key) >= 0 ? 4 : 2;
+  if(_drill.key === key) _drill.mode = (_drill.mode + 1) % cycle;
+  else { _drill.key = key; _drill.mode = (key === 'name' ? 1 : 0); }
+  renderDrill();
+}
+
+function renderDrill(){
+  var st = _drill, opts = st.opts, valueField = st.valueField, RD = window.reportData || {};
+  var body = document.getElementById('drillBody');
+  var getVal = typeof valueField === 'function' ? valueField : function(r){ return n(r[valueField]); };
+  var list = st.rows.filter(function(r){ return r && r.app_name; });
+  if(!list.length){ body.innerHTML = '<div class="drill-empty">Немає даних по апках</div>'; return; }
+  // Share-of-group only makes sense for additive counts (WAU, sessions, likes...), not for percentages or computed ratios.
+  var showShare = opts.showShare != null ? opts.showShare : (!opts.isPct && typeof valueField !== 'function');
+  var shareTotal = showShare ? list.reduce(function(s, r){ return s + getVal(r); }, 0) : 0;
+  var hasShare = showShare && shareTotal > 0;
+  var hasWow = !!(opts.wowField || opts.prevField);
+
+  // Which group this list is, and that group's own row in the same section (for the "Разом" row).
+  var groupKey = null, groupRow = null;
+  Object.keys(RD).forEach(function(sec){
+    var s = RD[sec];
+    if(!s || typeof s !== 'object') return;
+    Object.keys(DRILL_APPS_TO_GROUP).forEach(function(ak){
+      if(s[ak] === st.rows){ groupKey = DRILL_APPS_TO_GROUP[ak]; groupRow = s[groupKey] || null; }
+    });
+  });
+  if(!groupKey) groupKey = String(list[0].dimension || list[0].grp || '').toLowerCase();
+
+  // Sessions: 12169 (reportData.sess) when loaded, else 11684 (reportData.eng). Android/iOS only for 12169 and not for Web.
+  // In the modal opened from "Sessions" itself the value already is sessions, so the Сесії column is dropped.
+  var sessData = RD.sess || RD.eng || {};
+  var hasOS = !!RD.sess && groupKey !== 'web';
+  var showSess = valueField !== 'sessions';
+  var sessMap = {}, engMap = {};
+  Object.keys(DRILL_APPS_TO_GROUP).forEach(function(k){
+    (sessData[k] || []).forEach(function(e){ sessMap[e.dimension + '|' + e.app_name] = e; });
+    ((RD.eng || {})[k] || []).forEach(function(e){ engMap[e.dimension + '|' + e.app_name] = e; });
+  });
+  var sessGroup = sessData[groupKey] || null;
+  function keyOf(r){ return (r.dimension || r.grp) + '|' + r.app_name; }
+
+  function has(v){ return v != null && v !== ''; }
+  function relW(c, p){ return (has(c) && has(p) && n(p) > 0) ? (n(c) - n(p)) / n(p) * 100 : null; }
+  function wowOf(r, raw){
+    if(!r) return null;
+    if(opts.wowField && has(r[opts.wowField])) return n(r[opts.wowField]);
+    if(opts.prevField && raw != null){
+      var p = typeof opts.prevField === 'function' ? opts.prevField(r) : r[opts.prevField];
+      if(has(p) && n(p) > 0) return (raw - n(p)) / n(p) * 100;
+    }
+    return null;
+  }
+  // [value, WoW %] for each session column
+  var SESS_COLS = {
+    sess: function(e){ return e ? [has(e.sessions) ? n(e.sessions) : null, has(e.sessions_wow_pct) ? n(e.sessions_wow_pct) : null] : [null, null]; },
+    spu:  function(e){ return e ? [has(e.sessions_per_user) ? n(e.sessions_per_user) : null, relW(e.sessions_per_user, e.sessions_per_user_prev)] : [null, null]; },
+    spuA: function(e){ return e ? [has(e.spu_android) ? n(e.spu_android) : null, relW(e.spu_android, e.spu_android_prev)] : [null, null]; },
+    spuI: function(e){ return e ? [has(e.spu_ios) ? n(e.spu_ios) : null, relW(e.spu_ios, e.spu_ios_prev)] : [null, null]; }
+  };
+
+  // Sorting
+  function sortVal(r){
+    var k = st.key;
+    if(k === 'name') return r.app_name;
+    var raw = getVal(r);
+    if(k === 'val') return raw;
+    if(k === 'wow') return wowOf(r, raw);
+    var pair = SESS_COLS[k](sessMap[keyOf(r)]);
+    return st.mode >= 2 ? pair[1] : pair[0];
+  }
+  var asc = st.mode % 2 === 1;
+  list = list.slice().sort(function(a, b){
+    var x = sortVal(a), y = sortVal(b);
+    if(st.key === 'name') return asc ? String(x).localeCompare(String(y)) : String(y).localeCompare(String(x));
+    if(x == null && y == null) return 0;
+    if(x == null) return 1;   // empty values always at the bottom
+    if(y == null) return -1;
+    return asc ? x - y : y - x;
+  });
+
+  // Cells
+  function color(w){ return w >= 0 ? '#4ade80' : '#f87171'; }
+  function sub(w){ return w == null ? '' : '<span class="drill-sub" style="color:' + color(w) + '">' + pct(w) + '</span>'; }
+  function fmtVal(raw){ return raw == null ? '—' : opts.suffix ? raw.toFixed(1) + opts.suffix : opts.isPct ? fmt(raw) + '%' : fmtBig(raw); }
+  function wowCell(w){
+    if(!hasWow) return '';
+    if(w == null) return '<span class="drill-wow"></span>';
+    var s = opts.isPP ? (w >= 0 ? '+' : '') + w.toFixed(1) + 'pp' : pct(w);
+    return '<span class="drill-wow" style="color:' + color(w) + '">' + s + '</span>';
+  }
+  function sessCells(e){
+    var h = '';
+    if(showSess){
+      var s = SESS_COLS.sess(e);
+      h += '<span class="drill-sess">' + (s[0] == null ? '—' : fmtBig(s[0])) + sub(s[1]) + '</span>';
+    }
+    ['spu'].concat(hasOS ? ['spuA', 'spuI'] : []).forEach(function(k){
+      var p = SESS_COLS[k](e);
+      h += '<span class="drill-spu">' + (p[0] == null ? '—' : p[0].toFixed(1)) + sub(p[1]) + '</span>';
+    });
+    return h;
+  }
+
+  // Header (click to sort)
+  function hd(key, cls, label){
+    var on = st.key === key;
+    var ind = on ? ((st.mode >= 2 ? ' Δ' : '') + (st.mode % 2 ? ' ↑' : ' ↓')) : '';
+    return '<span class="' + cls + (on ? ' drill-sort' : '') + '" data-sort="' + key + '">' + label + ind + '</span>';
+  }
+  var head = '<div class="drill-row drill-head"><span class="drill-rank"></span>' + hd('name', 'drill-name', 'Апка') + hd('val', 'drill-val', 'Значення')
+    + (hasShare ? hd('val', 'drill-share', 'Частка') : '') + (hasWow ? hd('wow', 'drill-wow', 'WoW') : '')
+    + (showSess ? hd('sess', 'drill-sess', 'Сесії') : '') + hd('spu', 'drill-spu', 'Сес/юзер')
+    + (hasOS ? hd('spuA', 'drill-spu', 'Android') + hd('spuI', 'drill-spu', 'iOS') : '') + '</div>';
+
+  // "Разом" row: the group's own row from the same section; for additive metrics without one, the sum of apps.
+  var gRaw = null;
+  if(groupRow && (typeof valueField === 'function' || has(groupRow[valueField]))) gRaw = getVal(groupRow);
+  else if(hasShare) gRaw = shareTotal;
+  var total = '<div class="drill-row drill-total"><span class="drill-rank"></span><span class="drill-name">Разом' + (st.groupLabel ? ' (' + st.groupLabel + ')' : '') + '</span>'
+    + '<span class="drill-val">' + fmtVal(gRaw) + '</span>' + (hasShare ? '<span class="drill-share">100%</span>' : '')
+    + wowCell(groupRow ? wowOf(groupRow, gRaw) : null) + sessCells(sessGroup) + '</div>';
+
+  var rowsHtml = list.map(function(r, i){
+    var raw = getVal(r);
+    var eng = engMap[keyOf(r)];
+    var low = eng && has(eng.wau) && n(eng.wau) < DRILL_LOW_WAU;
+    return '<div class="drill-row' + (low ? ' drill-low' : '') + '"' + (low ? ' title="Мало юзерів (менше 1000 WAU) — відсотки тут шумні"' : '') + '>'
+      + '<span class="drill-rank">' + (i + 1) + '.</span><span class="drill-name">' + r.app_name + '</span>'
+      + '<span class="drill-val">' + fmtVal(raw) + '</span>'
+      + (hasShare ? '<span class="drill-share">' + (raw / shareTotal * 100).toFixed(0) + '%</span>' : '')
+      + wowCell(wowOf(r, raw)) + sessCells(sessMap[keyOf(r)]) + '</div>';
+  }).join('');
+
+  body.innerHTML = head + total + rowsHtml;
+  body.onclick = function(ev){
+    var t = ev.target.closest('[data-sort]');
+    if(t) drillSort(t.getAttribute('data-sort'));
+  };
+}
+
 function closeDrill(){ document.getElementById('drillOverlay').classList.remove('open'); }
-document.addEventListener('keydown', e=>{ if(e.key==='Escape') closeDrill(); });
+document.addEventListener('keydown', function(e){ if(e.key === 'Escape') closeDrill(); });
 
 // Tiny inline SVG sparkline for a 2-3 point trend. values: array of numbers (nulls allowed), oldest→newest.
 // labels: optional array of week strings (same length as values) for tooltip
@@ -352,7 +493,8 @@ const FILE_MAP = {
   'reactions':  /Social_React/i,
   'funnel-new': /Funnel_New|Engagement_Depth_New/i,
   'funnel-wau': /Funnel_Active|Engagement_Depth_Active/i,
-  'active':     /Active.?Audience/i
+  'active':     /Active.?Audience/i,
+  'sessions':   /Weekly_Sessions/i
 };
 
 const loaded = {};
@@ -367,25 +509,76 @@ function detectType(name){
 
 function handleFiles(files){
   Array.from(files).forEach(file=>{
-    const type = detectType(file.name);
-    if(!type) return;
+    if(/\.zip$/i.test(file.name)){
+      unzipCSVs(file)
+        .then(entries=>{
+          if(!entries.some(en=>detectType(en.name))) alert(`В архіві ${file.name} не знайдено CSV звіту`);
+          entries.forEach(en=>ingestCSV(en.name, en.text));
+        })
+        .catch(err=>alert(`Не вдалося прочитати архів ${file.name}: ${err.message}`));
+      return;
+    }
+    if(!detectType(file.name)) return;
     const reader = new FileReader();
-    reader.onload = e=>{
-      const newRows = parseCSV(e.target.result);
-      if(!loaded[type]) loaded[type] = [];
-      // Merge, deduping by week_str+dimension/grp+app_name in case the same week is uploaded twice
-      const keyOf = r => [r.week_str, r.dimension||r.grp, r.app_name].join('|');
-      const existingKeys = new Set(loaded[type].map(keyOf));
-      let added = 0;
-      newRows.forEach(r=>{
-        const k = keyOf(r);
-        if(!existingKeys.has(k)){ loaded[type].push(r); existingKeys.add(k); added++; }
-      });
-      markLoaded(type, file.name, loaded[type]);
-      document.getElementById('gen-btn').disabled = Object.keys(loaded).length < 3;
-    };
+    reader.onload = e=>ingestCSV(file.name, e.target.result);
     reader.readAsText(file, 'UTF-8');
   });
+}
+
+function ingestCSV(name, text){
+  const type = detectType(name);
+  if(!type) return;
+  const newRows = parseCSV(text);
+  if(!loaded[type]) loaded[type] = [];
+  // Merge, deduping by week_str+dimension/grp+app_name in case the same week is uploaded twice
+  const keyOf = r => [r.week_str, r.dimension||r.grp, r.app_name].join('|');
+  const existingKeys = new Set(loaded[type].map(keyOf));
+  let added = 0;
+  newRows.forEach(r=>{
+    const k = keyOf(r);
+    if(!existingKeys.has(k)){ loaded[type].push(r); existingKeys.add(k); added++; }
+  });
+  markLoaded(type, name, loaded[type]);
+  document.getElementById('gen-btn').disabled = Object.keys(loaded).length < 3;
+}
+
+// Reads every .csv inside a .zip (any folder depth) without external libs: walks the central directory,
+// inflates entries with DecompressionStream. Returns [{name: basename, text}].
+async function unzipCSVs(file){
+  const buf = await file.arrayBuffer();
+  const dv = new DataView(buf);
+  let eocd = -1;
+  for(let i = buf.byteLength - 22; i >= Math.max(0, buf.byteLength - 65557); i--){
+    if(dv.getUint32(i, true) === 0x06054b50){ eocd = i; break; }
+  }
+  if(eocd < 0) throw new Error('це не zip-архів');
+  const total = dv.getUint16(eocd + 10, true);
+  let p = dv.getUint32(eocd + 16, true);
+  if(total === 0xFFFF || p === 0xFFFFFFFF) throw new Error('zip64 не підтримується');
+  const out = [];
+  for(let n = 0; n < total; n++){
+    if(dv.getUint32(p, true) !== 0x02014b50) throw new Error('пошкоджений архів');
+    const flags = dv.getUint16(p + 8, true);
+    const method = dv.getUint16(p + 10, true);
+    const compSize = dv.getUint32(p + 20, true);
+    const nameLen = dv.getUint16(p + 28, true);
+    const extraLen = dv.getUint16(p + 30, true);
+    const commentLen = dv.getUint16(p + 32, true);
+    const localOff = dv.getUint32(p + 42, true);
+    const path = new TextDecoder(flags & 0x800 ? 'utf-8' : 'ibm866').decode(new Uint8Array(buf, p + 46, nameLen));
+    p += 46 + nameLen + extraLen + commentLen;
+    const name = path.split(/[\\/]/).pop();
+    if(!/\.csv$/i.test(name) || /^__MACOSX[\\/]/.test(path) || name.startsWith('._')) continue;
+    if(flags & 1) throw new Error('архів захищений паролем');
+    const dataOff = localOff + 30 + dv.getUint16(localOff + 26, true) + dv.getUint16(localOff + 28, true);
+    const data = new Uint8Array(buf, dataOff, compSize);
+    let bytes;
+    if(method === 0) bytes = data;
+    else if(method === 8) bytes = await new Response(new Blob([data]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).arrayBuffer();
+    else throw new Error(`непідтримуваний метод стиснення (${method})`);
+    out.push({name, text: new TextDecoder('utf-8').decode(bytes)});
+  }
+  return out;
 }
 
 function markLoaded(type, name, allRows){
@@ -410,6 +603,54 @@ dz.addEventListener('drop',e=>{ e.preventDefault(); dz.classList.remove('drag');
 function showUpload(){ document.getElementById('upload-screen').style.display='flex'; document.getElementById('report-screen').style.display='none'; }
 
 // ── Build Report ────────────────────────────────────────
+// ── Report week switcher ────────────────────────────────
+// All uploaded weeks stay in `loaded`; the report is built "as of" reportWeek (null = latest common week).
+// Selectable weeks = weeks present in EVERY loaded non-Retention type (a stray week of one type doesn't become
+// a report week). Retention is always one week behind the report week (so D7 has matured): the 21.09 report
+// shows the 14.09 Retention cohort. Every other type is capped at the report week itself.
+// `loaded` is swapped to the capped view only for the duration of analyzeAll() and restored right after.
+const RETENTION_LAG_WEEKS = 1;
+let reportWeek = null;
+function shiftWeek(ws, k){ const d = new Date(ws + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() + 7*k); return d.toISOString().slice(0,10); }
+function weekLabelOf(ws){
+  const a = new Date(ws + 'T00:00:00Z'), b = new Date(ws + 'T00:00:00Z'); b.setUTCDate(b.getUTCDate() + 6);
+  const dd = x => ('0' + x.getUTCDate()).slice(-2), mm = x => ('0' + (x.getUTCMonth()+1)).slice(-2);
+  return dd(a) + (mm(a) !== mm(b) ? '.' + mm(a) : '') + '–' + dd(b) + '.' + mm(b) + '.' + b.getUTCFullYear();
+}
+function reportWeeks(){
+  let common = null;
+  Object.keys(loaded).forEach(k=>{
+    if(k==='retention') return;
+    const ws = new Set((loaded[k]||[]).map(r=>r.week_str).filter(Boolean));
+    common = common ? new Set([...common].filter(w=>ws.has(w))) : ws;
+  });
+  return common ? [...common].sort() : [];
+}
+function cappedLoaded(week){
+  const out = {};
+  Object.keys(loaded).forEach(k=>{
+    const rows = loaded[k] || [];
+    if(!week){ out[k] = rows; return; }
+    const cap = k==='retention' ? shiftWeek(week, -RETENTION_LAG_WEEKS) : week;
+    out[k] = rows.filter(r=>!r.week_str || r.week_str <= cap);
+  });
+  return out;
+}
+function renderWeekSelect(){
+  const sel = document.getElementById('week-select');
+  if(!sel) return;
+  const weeks = reportWeeks();
+  if(weeks.length < 2){ sel.style.display = 'none'; return; }
+  const cur = reportWeek || weeks[weeks.length-1];
+  sel.innerHTML = weeks.slice().reverse().map(w=>'<option value="'+w+'"'+(w===cur?' selected':'')+'>Тиждень звіту: '+weekLabelOf(w)+'</option>').join('');
+  sel.style.display = '';
+}
+function selectReportWeek(w){
+  const weeks = reportWeeks();
+  reportWeek = (w && w !== weeks[weeks.length-1]) ? w : null;
+  buildReport();
+}
+
 function buildReport(){
   document.getElementById('upload-screen').style.display='none';
   const rs = document.getElementById('report-screen');
@@ -417,14 +658,23 @@ function buildReport(){
   document.getElementById('report-body').innerHTML='<div class="loading"><div class="spinner"></div>Аналізуємо дані...</div>';
 
   setTimeout(()=>{
+    if(reportWeek && reportWeeks().indexOf(reportWeek) < 0) reportWeek = null;
+    const full = {};
+    Object.keys(loaded).forEach(k=>{ full[k] = loaded[k]; });
+    const common = reportWeeks();
+    const view = cappedLoaded(reportWeek || common[common.length-1] || null);
     try {
+      Object.keys(view).forEach(k=>{ loaded[k] = view[k]; });
       const data = analyzeAll();
       window.reportData = data;
       renderReport(data);
     } catch(e){
       document.getElementById('report-body').innerHTML='<div class="loading" style="color:#f87171">Помилка: '+e.message+'</div>';
       console.error(e);
+    } finally {
+      Object.keys(full).forEach(k=>{ loaded[k] = full[k]; });
     }
+    renderWeekSelect();
   }, 100);
 }
 
@@ -641,6 +891,19 @@ function analyzeAll(){
     return rows.filter(r=>r['dimension']===dim && r['app_name']!=='' && r.week_str===currentWeek);
   }
 
+  // ── SESSIONS (query 12169: 30-min-gap sessions, Android/iOS split) — drill-down columns; also overrides D.eng sessions below ──
+  if(loaded.sessions){
+    const rows = loaded.sessions;
+    const sTop = topRow(rows);
+    D.sess = {
+      clubs: sTop('Clubs')[0] || {}, flagman: sTop('Flagman')[0] || {}, league: sTop('League')[0] || {}, web: sTop('Web')[0] || {},
+      clubApps: appRows(rows,'Clubs'),
+      flagmanApps: appRows(rows,'Flagman'),
+      leagueApps: appRows(rows,'League'),
+      webApps: appRows(rows,'Web')
+    };
+  }
+
   // ── ENGAGEMENT ──
   if(loaded.engagement){
     const rows = loaded.engagement;
@@ -668,6 +931,28 @@ function analyzeAll(){
         web_sessions: metricTrend(weekSeries(rows,'dimension','Web'), 'sessions'),
       }
     };
+  }
+
+  // ── Replace SDK-session numbers (11684) with 12169 sessions everywhere the report uses them ──
+  // (Engagement cards + their drill, WoW alerts/insights, "N weeks in a row" streaks). Only when 12169's latest
+  // week is the same as the Engagement week; otherwise the report keeps 11684 sessions. Copies, not mutation,
+  // so re-generating without the sessions file falls back cleanly.
+  if(D.eng && D.sess && loaded.sessions){
+    const sRows = loaded.sessions;
+    const sWeeks = lastWeeks(sRows);
+    if(sWeeks[sWeeks.length-1] === D.eng.weekStr){
+      const sTop = topRow(sRows);
+      const F = ['sessions','sessions_prev','sessions_wow_pct','sessions_per_user'];
+      const pick = s => { const o = {}; F.forEach(f=>{ o[f] = s ? s[f] : ''; }); return o; };
+      [['Clubs','clubs','clubApps'],['Flagman','flagman','flagmanApps'],['League','league','leagueApps'],['Web','web','webApps']].forEach(([g,key,appsKey])=>{
+        D.eng[key] = {...D.eng[key], ...pick(sTop(g)[0])};
+        const byName = {};
+        (D.sess[appsKey]||[]).forEach(s=>{ byName[s.app_name] = s; });
+        D.eng[appsKey] = D.eng[appsKey].map(r=>({...r, ...pick(byName[r.app_name])}));
+        D.eng.trends[key+'_sessions'] = metricTrend(weekSeries(sRows,'dimension',g), 'sessions');
+      });
+      D.eng.sessionsSource = '12169';
+    }
   }
 
   // ── RETENTION ──
@@ -1806,37 +2091,6 @@ function generateAlerts(D){
   return result;
 }
 
-function generateInsights(D){
-  const ins = [];
-  if(D.eng){
-    const f=D.eng.flagman, c=D.eng.clubs, w=D.eng.web;
-    if(n(f.wau_wow_pct)>0) ins.push({color:'#4ade80', text:`Flagman — головний драйвер росту: WAU ${pct(f.wau_wow_pct)}${D.ugc&&D.ugc.flagman.threads_wow_pct?', Threads '+pct(D.ugc.flagman.threads_wow_pct):''}${D.subs&&D.subs.flagman.follows_wow_pct?', Follows '+pct(D.subs.flagman.follows_wow_pct):''}` });
-    else ins.push({color:'#f87171', text:`Flagman WAU: ${pct(f.wau_wow_pct)} — зростання зупинилось`});
-    if(D.react && n(D.react.clubs.polls_wow_pct)>50) ins.push({color:'#fbbf24', text:`Clubs: попри падіння WAU (${pct(c.wau_wow_pct)}), Content-опитування вибухнули (${pct(D.react.clubs.polls_wow_pct)}) — висока подійна залученість`});
-    if(D.react && n(D.react.clubs.match_votes_wow_pct)>50) ins.push({color:'#fbbf24', text:`Clubs: попри падіння WAU (${pct(c.wau_wow_pct)}), "Хто переможе?" вибухнули (${pct(D.react.clubs.match_votes_wow_pct)}) — висока подійна залученість`});
-    else ins.push({color:'#9ca3af', text:`Clubs утримують аудиторію (WAU ${D.ret?D.ret.clubs.retention_pct:'—'}%), але сесії ${pct(c.sessions_wow_pct)}`});
-    if(n(w.wau_wow_pct)<-5){
-      const sessionsDroppedLess = n(w.sessions_wow_pct) > n(w.wau_wow_pct); // sessions fell less than WAU = per-user activity up
-      if(sessionsDroppedLess && n(w.sessions_wow_pct)>=0){
-        ins.push({color:'#c084fc', text:`Web втрачає аудиторію (WAU ${pct(w.wau_wow_pct)}), але ті хто залишився — активніші (Sessions ${pct(w.sessions_wow_pct)})`});
-      } else if(sessionsDroppedLess){
-        ins.push({color:'#c084fc', text:`Web втрачає аудиторію (WAU ${pct(w.wau_wow_pct)}), Sessions падають повільніше (${pct(w.sessions_wow_pct)}) — частота використання у тих хто залишився не сильно змінилась`});
-      } else {
-        ins.push({color:'#f87171', text:`Web втрачає і аудиторію (WAU ${pct(w.wau_wow_pct)}), і активність тих хто залишився (Sessions ${pct(w.sessions_wow_pct)}) — падіння глибше ніж просто відтік користувачів`});
-      }
-    }
-  }
-  if(D.ret){
-    const c=D.ret.clubs;
-    ins.push({color:'#60a5fa', text:`Повернення активних юзерів: Clubs ${c.retention_pct}% (${pp(c.retention_wow_pp)}), Flagman ${D.ret.flagman.retention_pct}% (${pp(D.ret.flagman.retention_wow_pp)}), Web ${D.ret.web.retention_pct}% (${pp(D.ret.web.retention_wow_pp)})`});
-  }
-  if(D.ugc){
-    const c=D.ugc.clubs;
-    if(n(c.chatters_wow_pct)<-10) ins.push({color:'#f87171', text:`Chatters у Clubs ${pct(c.chatters_wow_pct)} — ймовірно відсутність матчів або технічна причина`});
-  }
-  return ins.slice(0,5);
-}
-
 function findHighlights(D){
   // Find best and worst clubs by WAU WoW
   const hl = { bestClubs:[], worstClubs:[], topPolls:[] };
@@ -2220,10 +2474,10 @@ function renderReport(D){
       return list.map((r,i)=>{
         const v=n(r[field]), wow=n(r[wowField]), share=total>0?v/total*100:0;
         const tv=trendMap&&trendMap[r.app_name];
-        const spark=tv?sparkline(tv,color,50,14,D.react.weeks):'';
-        return `<div style="display:flex;align-items:center;gap:6px;padding:3px 0;border-bottom:1px solid #1a1d27;font-size:11px">
-          <span style="font-size:10px;color:#6b7280;width:14px;flex-shrink:0">${i+1}.</span>
-          <span style="flex:1;color:#e8eaf0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.app_name}</span>
+        const spark=tv?sparkline(tv,color,40,14,D.react.weeks):'';
+        return `<div style="display:flex;align-items:center;gap:4px;padding:3px 0;border-bottom:1px solid #1a1d27;font-size:11px">
+          <span style="font-size:10px;color:#6b7280;width:12px;flex-shrink:0">${i+1}.</span>
+          <span title="${r.app_name}" style="flex:1;min-width:0;color:#e8eaf0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.app_name}</span>
           <span style="font-family:monospace;font-size:11px;font-weight:700;color:#fff;flex-shrink:0;width:38px;text-align:right">${fmtBig(v)}</span>
           <span style="font-family:monospace;font-size:10px;color:${color};flex-shrink:0;width:34px;text-align:right">${share.toFixed(1)}%</span>
           <span style="font-family:monospace;font-size:10px;color:${wow>=0?'#4ade80':'#f87171'};flex-shrink:0;width:40px;text-align:right">${pct(wow)}</span>
@@ -2388,7 +2642,9 @@ function renderReport(D){
 }
 
 // ── Download ─────────────────────────────────────────────
-function downloadReport(){
+// Builds the standalone HTML. pack (optional) = base64 gzip of {cur, order, m:{week:{label,w,b,d}}} for every
+// loadable week; when present, the exported file gets its own month switcher (see exportSwitcherScript).
+function buildExportHtml(pack){
   const weekStr = document.getElementById('r-week').textContent;
   const body = document.getElementById('report-body').innerHTML;
   const full = `<!DOCTYPE html><html lang="uk"><head><meta charset="UTF-8"><title>Weekly Report</title>
@@ -2397,7 +2653,7 @@ function downloadReport(){
 body{background:#0f1117;color:#e8eaf0;font-family:system-ui,sans-serif;font-size:13px;padding:24px}
 .g3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:12px}
 .g2{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:12px}
-.g4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:12px}
+.g4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:12px}
 .g32{display:grid;grid-template-columns:2fr 1fr;gap:12px;margin-bottom:12px}
 .card{background:#161921;border:1px solid #252836;border-radius:10px;padding:14px 16px}
 .ct{font-size:10px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:#6b7280;margin-bottom:10px}
@@ -2444,27 +2700,38 @@ body{background:#0f1117;color:#e8eaf0;font-family:system-ui,sans-serif;font-size
 .drill-trigger:hover{opacity:0.72}
 .drill-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:1000;align-items:center;justify-content:center;padding:24px}
 .drill-overlay.open{display:flex}
-.drill-modal{background:#161921;border:1px solid #252836;border-radius:12px;width:440px;max-width:100%;max-height:80vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,0.5)}
+.drill-modal{background:#161921;border:1px solid #252836;border-radius:12px;width:720px;max-width:100%;max-height:80vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,0.5)}
 .drill-header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 16px;border-bottom:1px solid #252836;flex-shrink:0}
 .drill-title{font-size:13px;font-weight:600;color:#fff}
 .drill-close{background:none;border:none;color:#6b7280;font-size:14px;cursor:pointer;padding:4px 8px;border-radius:6px;line-height:1}
 .drill-close:hover{background:#1e2130;color:#fff}
-.drill-body{overflow-y:auto;padding:6px 16px 14px}
+.drill-body{overflow-y:auto;overflow-x:hidden;padding:6px 16px 14px}
 .drill-row{display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid #1a1d27;font-size:12px}
 .drill-row:last-child{border-bottom:none}
 .drill-rank{color:#6b7280;font-size:10px;width:16px;flex-shrink:0}
 .drill-name{flex:1;color:#e8eaf0;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.drill-val{font-family:monospace;font-weight:700;color:#fff;flex-shrink:0}
+.drill-val{font-family:monospace;font-weight:700;color:#fff;flex-shrink:0;min-width:64px;text-align:right}
 .drill-wow{font-family:monospace;font-size:11px;flex-shrink:0;width:58px;text-align:right}
 .drill-share{font-family:monospace;font-size:11px;color:#6b7280;flex-shrink:0;width:40px;text-align:right}
+.drill-sub{display:block;font-size:9px;margin-top:1px}
+.drill-sess{font-family:monospace;font-size:11px;color:#9ca3af;flex-shrink:0;width:56px;text-align:right}
+.drill-spu{font-family:monospace;font-size:11px;color:#9ca3af;flex-shrink:0;width:64px;text-align:right}
+.drill-head{position:sticky;top:0;background:#161921;z-index:1}
+.drill-head span{font-family:inherit!important;font-size:10px!important;font-weight:500!important;color:#6b7280!important;text-transform:uppercase;letter-spacing:0;white-space:nowrap}
 .drill-empty{color:#6b7280;font-size:12px;padding:12px 0}
-</style></head><body>
-<div style="max-width:1100px;margin:0 auto">
+.drill-head [data-sort]{cursor:pointer;user-select:none}
+.drill-head [data-sort]:hover{color:#e8eaf0!important}
+.drill-head .drill-sort{color:#e8eaf0!important}
+.drill-total{background:#1e2130;border-radius:6px;padding-left:6px;padding-right:6px;margin:4px -6px}
+.drill-total .drill-name{color:#fff;font-weight:600}
+.drill-low{opacity:.45}</style></head><body>
+<div style="max-width:1320px;margin:0 auto">
 <div style="display:flex;align-items:baseline;gap:12px;margin-bottom:24px;padding-bottom:14px;border-bottom:1px solid #1e2130">
 <h1 style="font-size:20px;font-weight:700;color:#fff">Огляд тижня</h1>
-<span style="font-size:13px;color:#6b7280">${weekStr}</span>
+<span id="x-week" style="font-size:13px;color:#6b7280">${weekStr}</span>
+${pack ? '<select id="x-month" style="display:none;margin-left:auto;background:#161921;border:1px solid #252836;color:#e8eaf0;border-radius:8px;padding:6px 10px;font-size:12px;font-family:inherit;cursor:pointer"></select>' : ''}
 </div>
-${body}
+<div id="report-body">${body}</div>
 <div style="margin-top:20px;padding-top:12px;border-top:1px solid #1e2130;font-size:10px;color:#374151;display:flex;justify-content:space-between">
 <span>Community Weekly Report · Redash #651</span>
 <span>${document.getElementById('footer-date').textContent}</span>
@@ -2485,52 +2752,248 @@ function n(v){ return parseFloat(v)||0; }
 function fmt(v,decimals=1){ const num = parseFloat(v); if(isNaN(num)) return v||'—'; return Math.abs(num)>=1000 ? num.toLocaleString('uk-UA') : num.toFixed(decimals).replace(/\\.0$/,''); }
 function fmtBig(v){ const num=parseFloat(v)||0; if(Math.abs(num)>=1000000) return (num/1000000).toFixed(1)+'M'; if(Math.abs(num)>=1000) return (num/1000).toFixed(1)+'K'; return Math.round(num).toLocaleString('uk-UA'); }
 function pct(v){ const num=parseFloat(v)||0; const s=num>=0?'+':''; return s+num.toFixed(1)+'%'; }
+// ── Drill-down modal: click any group-level value to see the same metric per-app ──
+// NOTE: this block is copied verbatim into downloadReport()'s exported file, which embeds it inside a JS template
+// literal — so it must stay free of backticks, template placeholders and backslashes (plain string concatenation only).
+// openDrill(title, groupLabel, rows, valueField, opts):
+//   rows: per-app rows of one group (a window.reportData.<section>.<group>Apps array); valueField: CSV column or row=>number.
+//   opts.wowField: column with a ready WoW; opts.prevField: previous-week column (or row=>number) to compute WoW;
+//   opts.isPP: WoW in percentage points; opts.isPct: value is a percentage; opts.suffix: text after the value (e.g. '×').
+// Features: "Разом" group row on top, sortable columns (click header; session columns cycle value↓ value↑ WoW↓ WoW↑),
+// sessions from 12169 (reportData.sess) with Android/iOS split, small apps (<1000 WAU) dimmed.
+var DRILL_APPS_TO_GROUP = {clubApps: 'clubs', flagmanApps: 'flagman', leagueApps: 'league', webApps: 'web'};
+var DRILL_LOW_WAU = 1000;
+var _drill = null;
+
 function openDrill(title, groupLabel, rows, valueField, opts){
-  opts = opts || {};
-  // valueField is usually a CSV column name; pass a function(row)=>number instead for computed ratios (e.g. likes/liking_users).
-  const getVal = typeof valueField === 'function' ? valueField : (r)=>n(r[valueField]);
-  const list = (rows||[]).filter(r=>r && r.app_name).slice().sort((a,b)=>getVal(b)-getVal(a));
-  const showShare = opts.showShare!=null ? opts.showShare : (!opts.isPct && typeof valueField !== 'function');
-  const shareTotal = showShare ? list.reduce((s,r)=>s+getVal(r),0) : 0;
-  document.getElementById('drillTitle').textContent = groupLabel ? title+' — '+groupLabel : title;
-  const body = document.getElementById('drillBody');
-  if(!list.length){
-    body.innerHTML = '<div class="drill-empty">Немає даних по апках</div>';
-  } else {
-    body.innerHTML = list.map((r,i)=>{
-      const raw = getVal(r);
-      const val = opts.suffix ? raw.toFixed(1)+opts.suffix : opts.isPct ? fmt(raw)+'%' : fmtBig(raw);
-      const shareHtml = (showShare && shareTotal>0) ? '<span class="drill-share">'+(raw/shareTotal*100).toFixed(0)+'%</span>' : '';
-      let wowHtml = '';
-      let w = null;
-      if(opts.wowField && r[opts.wowField]!=null && r[opts.wowField]!==''){
-        w = n(r[opts.wowField]);
-      } else if(opts.prevField){
-        const prevRaw = typeof opts.prevField === 'function' ? opts.prevField(r) : r[opts.prevField];
-        if(prevRaw!=null && prevRaw!==''){
-          const prev = n(prevRaw);
-          if(prev>0) w = (raw-prev)/prev*100;
-        }
-      }
-      if(w!=null){
-        const wowStr = opts.isPP ? (w>=0?'+':'')+w.toFixed(1)+'pp' : pct(w);
-        wowHtml = '<span class="drill-wow" style="color:'+(w>=0?'#4ade80':'#f87171')+'">'+wowStr+'</span>';
-      }
-      return '<div class="drill-row"><span class="drill-rank">'+(i+1)+'.</span><span class="drill-name">'+r.app_name+'</span><span class="drill-val">'+val+'</span>'+shareHtml+wowHtml+'</div>';
-    }).join('');
-  }
+  _drill = {title: title, groupLabel: groupLabel, rows: rows || [], valueField: valueField, opts: opts || {}, key: 'val', mode: 0};
+  document.getElementById('drillTitle').textContent = groupLabel ? title + ' — ' + groupLabel : title;
+  renderDrill();
   document.getElementById('drillOverlay').classList.add('open');
 }
+
+function drillSort(key){
+  if(!_drill) return;
+  var cycle = ['sess', 'spu', 'spuA', 'spuI'].indexOf(key) >= 0 ? 4 : 2;
+  if(_drill.key === key) _drill.mode = (_drill.mode + 1) % cycle;
+  else { _drill.key = key; _drill.mode = (key === 'name' ? 1 : 0); }
+  renderDrill();
+}
+
+function renderDrill(){
+  var st = _drill, opts = st.opts, valueField = st.valueField, RD = window.reportData || {};
+  var body = document.getElementById('drillBody');
+  var getVal = typeof valueField === 'function' ? valueField : function(r){ return n(r[valueField]); };
+  var list = st.rows.filter(function(r){ return r && r.app_name; });
+  if(!list.length){ body.innerHTML = '<div class="drill-empty">Немає даних по апках</div>'; return; }
+  // Share-of-group only makes sense for additive counts (WAU, sessions, likes...), not for percentages or computed ratios.
+  var showShare = opts.showShare != null ? opts.showShare : (!opts.isPct && typeof valueField !== 'function');
+  var shareTotal = showShare ? list.reduce(function(s, r){ return s + getVal(r); }, 0) : 0;
+  var hasShare = showShare && shareTotal > 0;
+  var hasWow = !!(opts.wowField || opts.prevField);
+
+  // Which group this list is, and that group's own row in the same section (for the "Разом" row).
+  var groupKey = null, groupRow = null;
+  Object.keys(RD).forEach(function(sec){
+    var s = RD[sec];
+    if(!s || typeof s !== 'object') return;
+    Object.keys(DRILL_APPS_TO_GROUP).forEach(function(ak){
+      if(s[ak] === st.rows){ groupKey = DRILL_APPS_TO_GROUP[ak]; groupRow = s[groupKey] || null; }
+    });
+  });
+  if(!groupKey) groupKey = String(list[0].dimension || list[0].grp || '').toLowerCase();
+
+  // Sessions: 12169 (reportData.sess) when loaded, else 11684 (reportData.eng). Android/iOS only for 12169 and not for Web.
+  // In the modal opened from "Sessions" itself the value already is sessions, so the Сесії column is dropped.
+  var sessData = RD.sess || RD.eng || {};
+  var hasOS = !!RD.sess && groupKey !== 'web';
+  var showSess = valueField !== 'sessions';
+  var sessMap = {}, engMap = {};
+  Object.keys(DRILL_APPS_TO_GROUP).forEach(function(k){
+    (sessData[k] || []).forEach(function(e){ sessMap[e.dimension + '|' + e.app_name] = e; });
+    ((RD.eng || {})[k] || []).forEach(function(e){ engMap[e.dimension + '|' + e.app_name] = e; });
+  });
+  var sessGroup = sessData[groupKey] || null;
+  function keyOf(r){ return (r.dimension || r.grp) + '|' + r.app_name; }
+
+  function has(v){ return v != null && v !== ''; }
+  function relW(c, p){ return (has(c) && has(p) && n(p) > 0) ? (n(c) - n(p)) / n(p) * 100 : null; }
+  function wowOf(r, raw){
+    if(!r) return null;
+    if(opts.wowField && has(r[opts.wowField])) return n(r[opts.wowField]);
+    if(opts.prevField && raw != null){
+      var p = typeof opts.prevField === 'function' ? opts.prevField(r) : r[opts.prevField];
+      if(has(p) && n(p) > 0) return (raw - n(p)) / n(p) * 100;
+    }
+    return null;
+  }
+  // [value, WoW %] for each session column
+  var SESS_COLS = {
+    sess: function(e){ return e ? [has(e.sessions) ? n(e.sessions) : null, has(e.sessions_wow_pct) ? n(e.sessions_wow_pct) : null] : [null, null]; },
+    spu:  function(e){ return e ? [has(e.sessions_per_user) ? n(e.sessions_per_user) : null, relW(e.sessions_per_user, e.sessions_per_user_prev)] : [null, null]; },
+    spuA: function(e){ return e ? [has(e.spu_android) ? n(e.spu_android) : null, relW(e.spu_android, e.spu_android_prev)] : [null, null]; },
+    spuI: function(e){ return e ? [has(e.spu_ios) ? n(e.spu_ios) : null, relW(e.spu_ios, e.spu_ios_prev)] : [null, null]; }
+  };
+
+  // Sorting
+  function sortVal(r){
+    var k = st.key;
+    if(k === 'name') return r.app_name;
+    var raw = getVal(r);
+    if(k === 'val') return raw;
+    if(k === 'wow') return wowOf(r, raw);
+    var pair = SESS_COLS[k](sessMap[keyOf(r)]);
+    return st.mode >= 2 ? pair[1] : pair[0];
+  }
+  var asc = st.mode % 2 === 1;
+  list = list.slice().sort(function(a, b){
+    var x = sortVal(a), y = sortVal(b);
+    if(st.key === 'name') return asc ? String(x).localeCompare(String(y)) : String(y).localeCompare(String(x));
+    if(x == null && y == null) return 0;
+    if(x == null) return 1;   // empty values always at the bottom
+    if(y == null) return -1;
+    return asc ? x - y : y - x;
+  });
+
+  // Cells
+  function color(w){ return w >= 0 ? '#4ade80' : '#f87171'; }
+  function sub(w){ return w == null ? '' : '<span class="drill-sub" style="color:' + color(w) + '">' + pct(w) + '</span>'; }
+  function fmtVal(raw){ return raw == null ? '—' : opts.suffix ? raw.toFixed(1) + opts.suffix : opts.isPct ? fmt(raw) + '%' : fmtBig(raw); }
+  function wowCell(w){
+    if(!hasWow) return '';
+    if(w == null) return '<span class="drill-wow"></span>';
+    var s = opts.isPP ? (w >= 0 ? '+' : '') + w.toFixed(1) + 'pp' : pct(w);
+    return '<span class="drill-wow" style="color:' + color(w) + '">' + s + '</span>';
+  }
+  function sessCells(e){
+    var h = '';
+    if(showSess){
+      var s = SESS_COLS.sess(e);
+      h += '<span class="drill-sess">' + (s[0] == null ? '—' : fmtBig(s[0])) + sub(s[1]) + '</span>';
+    }
+    ['spu'].concat(hasOS ? ['spuA', 'spuI'] : []).forEach(function(k){
+      var p = SESS_COLS[k](e);
+      h += '<span class="drill-spu">' + (p[0] == null ? '—' : p[0].toFixed(1)) + sub(p[1]) + '</span>';
+    });
+    return h;
+  }
+
+  // Header (click to sort)
+  function hd(key, cls, label){
+    var on = st.key === key;
+    var ind = on ? ((st.mode >= 2 ? ' Δ' : '') + (st.mode % 2 ? ' ↑' : ' ↓')) : '';
+    return '<span class="' + cls + (on ? ' drill-sort' : '') + '" data-sort="' + key + '">' + label + ind + '</span>';
+  }
+  var head = '<div class="drill-row drill-head"><span class="drill-rank"></span>' + hd('name', 'drill-name', 'Апка') + hd('val', 'drill-val', 'Значення')
+    + (hasShare ? hd('val', 'drill-share', 'Частка') : '') + (hasWow ? hd('wow', 'drill-wow', 'WoW') : '')
+    + (showSess ? hd('sess', 'drill-sess', 'Сесії') : '') + hd('spu', 'drill-spu', 'Сес/юзер')
+    + (hasOS ? hd('spuA', 'drill-spu', 'Android') + hd('spuI', 'drill-spu', 'iOS') : '') + '</div>';
+
+  // "Разом" row: the group's own row from the same section; for additive metrics without one, the sum of apps.
+  var gRaw = null;
+  if(groupRow && (typeof valueField === 'function' || has(groupRow[valueField]))) gRaw = getVal(groupRow);
+  else if(hasShare) gRaw = shareTotal;
+  var total = '<div class="drill-row drill-total"><span class="drill-rank"></span><span class="drill-name">Разом' + (st.groupLabel ? ' (' + st.groupLabel + ')' : '') + '</span>'
+    + '<span class="drill-val">' + fmtVal(gRaw) + '</span>' + (hasShare ? '<span class="drill-share">100%</span>' : '')
+    + wowCell(groupRow ? wowOf(groupRow, gRaw) : null) + sessCells(sessGroup) + '</div>';
+
+  var rowsHtml = list.map(function(r, i){
+    var raw = getVal(r);
+    var eng = engMap[keyOf(r)];
+    var low = eng && has(eng.wau) && n(eng.wau) < DRILL_LOW_WAU;
+    return '<div class="drill-row' + (low ? ' drill-low' : '') + '"' + (low ? ' title="Мало юзерів (менше 1000 WAU) — відсотки тут шумні"' : '') + '>'
+      + '<span class="drill-rank">' + (i + 1) + '.</span><span class="drill-name">' + r.app_name + '</span>'
+      + '<span class="drill-val">' + fmtVal(raw) + '</span>'
+      + (hasShare ? '<span class="drill-share">' + (raw / shareTotal * 100).toFixed(0) + '%</span>' : '')
+      + wowCell(wowOf(r, raw)) + sessCells(sessMap[keyOf(r)]) + '</div>';
+  }).join('');
+
+  body.innerHTML = head + total + rowsHtml;
+  body.onclick = function(ev){
+    var t = ev.target.closest('[data-sort]');
+    if(t) drillSort(t.getAttribute('data-sort'));
+  };
+}
+
 function closeDrill(){ document.getElementById('drillOverlay').classList.remove('open'); }
-document.addEventListener('keydown', e=>{ if(e.key==='Escape') closeDrill(); });
+document.addEventListener('keydown', function(e){ if(e.key === 'Escape') closeDrill(); });
+${pack ? exportSwitcherScript(pack) : ''}
 \x3C/script\x3E
 </body></html>`;
+  return full;
+}
 
-  const blob = new Blob([full],{type:'text/html'});
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = 'weekly-report-'+new Date().toISOString().slice(0,10)+'.html';
-  a.click();
+// Month switcher that runs inside the exported file: unpacks the embedded months (gzip, DecompressionStream)
+// and swaps the report body, the month label and window.reportData (so drill-downs follow). If the browser
+// can't decompress, the switcher stays hidden and the file shows the month it was saved on.
+function exportSwitcherScript(pack){
+  return "(function(){" +
+    "var sel = document.getElementById('x-month'); if(!sel || !window.DecompressionStream) return;" +
+    "var bin = atob('" + pack + "'); var u = new Uint8Array(bin.length); for(var i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i);" +
+    "new Response(new Blob([u]).stream().pipeThrough(new DecompressionStream('gzip'))).text().then(function(t){" +
+    "  var P = JSON.parse(t);" +
+    "  sel.innerHTML = P.order.slice().reverse().map(function(m){ return '<option value=\"' + m + '\"' + (m === P.cur ? ' selected' : '') + '>Тиждень звіту: ' + P.m[m].label + '</option>'; }).join('');" +
+    "  sel.style.display = '';" +
+    "  sel.onchange = function(){ var e = P.m[sel.value]; if(!e) return; closeDrill(); document.getElementById('report-body').innerHTML = e.b; document.getElementById('x-week').textContent = e.w; window.reportData = e.d; window.scrollTo(0, 0); };" +
+    "}).catch(function(){ sel.style.display = 'none'; });" +
+    "})();";
+}
+
+// Renders the report for every selectable month (same capping as the on-screen switcher) and packs
+// {label, month label text, body html, reportData} per month into gzip+base64. Restores the on-screen report after.
+async function buildWeeksPack(){
+  const months = reportWeeks();
+  if(months.length < 2 || !window.CompressionStream) return null;
+  const cur = reportWeek || months[months.length-1];
+  const full = {};
+  Object.keys(loaded).forEach(k=>{ full[k] = loaded[k]; });
+  const m = {};
+  const renderAs = month => {
+    const view = cappedLoaded(month);
+    try {
+      Object.keys(view).forEach(k=>{ loaded[k] = view[k]; });
+      const data = analyzeAll();
+      window.reportData = data;
+      renderReport(data);
+      return data;
+    } finally {
+      Object.keys(full).forEach(k=>{ loaded[k] = full[k]; });
+    }
+  };
+  try {
+    months.forEach(month=>{
+      const data = renderAs(month);
+      m[month] = { label: weekLabelOf(month), w: document.getElementById('r-week').textContent, b: document.getElementById('report-body').innerHTML, d: data };
+    });
+  } finally {
+    renderAs(cur);
+    renderWeekSelect();
+  }
+  const json = JSON.stringify({ cur: cur, order: months, m: m });
+  const gz = await new Response(new Blob([json]).stream().pipeThrough(new CompressionStream('gzip'))).arrayBuffer();
+  const bytes = new Uint8Array(gz);
+  let bin = '';
+  for(let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+  return btoa(bin);
+}
+
+async function downloadReport(){
+  const btn = document.querySelector('.header-actions button[onclick="downloadReport()"]');
+  const label = btn ? btn.textContent : '';
+  if(btn){ btn.textContent = 'Готую HTML…'; btn.disabled = true; }
+  try {
+    let pack = null;
+    try { pack = await buildWeeksPack(); } catch(e){ console.error(e); pack = null; }
+    const full = buildExportHtml(pack);
+    const blob = new Blob([full],{type:'text/html'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    const cur = reportWeek || reportWeeks().slice(-1)[0] || '';
+    a.download = 'weekly-report-' + (cur || new Date().toISOString().slice(0,10)) + '.html';
+    a.click();
+  } finally {
+    if(btn){ btn.textContent = label; btn.disabled = false; }
+  }
 }
 </script>
 </body>
