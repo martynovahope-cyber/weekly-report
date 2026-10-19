@@ -221,6 +221,7 @@ input[type=file]{display:none}
     <div class="file-item" id="fi-funnel-wau"><div class="file-dot missing" id="fd-funnel-wau"></div><span class="file-name">Weekly_Engagement_Depth_Active_Users_(WAU)</span><span class="file-status missing" id="fs-funnel-wau">очікується</span></div>
     <div class="file-item" id="fi-active"><div class="file-dot missing" id="fd-active"></div><span class="file-name">Weekly_Active_Audience</span><span class="file-status missing" id="fs-active">очікується</span></div>
     <div class="file-item" id="fi-sessions"><div class="file-dot missing" id="fd-sessions"></div><span class="file-name">Weekly_Sessions (query 12169)</span><span class="file-status missing" id="fs-sessions">очікується</span></div>
+    <div class="file-item" id="fi-bots"><div class="file-dot missing" id="fd-bots"></div><span class="file-name">Weekly_Web_Bots_Estimate (query 12239, необов'язково)</span><span class="file-status missing" id="fs-bots">очікується</span></div>
   </div>
 
   <button class="generate-btn" id="gen-btn" disabled onclick="buildReport()">Генерувати звіт →</button>
@@ -494,7 +495,8 @@ const FILE_MAP = {
   'funnel-new': /Funnel_New|Engagement_Depth_New/i,
   'funnel-wau': /Funnel_Active|Engagement_Depth_Active/i,
   'active':     /Active.?Audience/i,
-  'sessions':   /Weekly_Sessions/i
+  'sessions':   /Weekly_Sessions/i,
+  'bots':       /Web_Bots/i
 };
 
 const loaded = {};
@@ -1010,7 +1012,7 @@ function analyzeAll(){
   if(loaded.active){
     const rows = loaded.active;
     const top = topRow(rows);
-    const activeCats = ['comment','reaction','follow','thread','post','blog','poll_match','chat','active'];
+    const activeCats = ['comment','reaction','follow','thread','post','blog','poll_match','chat','chat_reaction','active'];
     D.active = {
       clubs: top('Clubs')[0]||{}, flagman: top('Flagman')[0]||{}, league: top('League')[0]||{}, web: top('Web')[0]||{},
       clubApps: appRows(rows,'Clubs'), flagmanApps: appRows(rows,'Flagman'), leagueApps: appRows(rows,'League'), webApps: appRows(rows,'Web'),
@@ -1057,6 +1059,12 @@ function analyzeAll(){
   // ── REACTIONS ──
   if(loaded.reactions){
     const rows = loaded.reactions;
+    // Реакції в чатах (chat_likes/chat_dislikes, query 11690 з 19.10.2026; iOS з 30.09.2026). У старих CSV колонок нема:
+    // до тижня релізу це справжній 0, після — дані невідомі (null, щоб не малювати фейковий 0).
+    rows.forEach(r=>{
+      if(r.chat_likes!==undefined) r.chat_reactions = n(r.chat_likes)+n(r.chat_dislikes);
+      else r.chat_reactions = r.week_str < '2026-09-28' ? 0 : null;
+    });
     const top = topRow(rows);
     const reactWeeks = lastWeeks(rows);
     const _clubPollMap = {}, _flagPollMap = {}, _leaguePollMap = {}, _webPollMap = {};
@@ -1110,6 +1118,7 @@ function analyzeAll(){
           [['likes_total','likes'],['dislikes_total','dislikes'],['likes_posts','likes_posts'],['dislikes_posts','dislikes_posts'],['poll_votes','polls'],['match_votes','match']].forEach(([field,key])=>{
             t[dim+'_'+key]=metricTrend(ws,field);
           });
+          t[dim+'_chat_reactions'] = ws.weeks.map(w=>{ const r=ws.series[w]; return r && r.chat_reactions!=null ? r.chat_reactions : null; });
         });
         return t;
       })()
@@ -1136,11 +1145,34 @@ function analyzeAll(){
     };
   }
 
+  // ── WEB BOTS ESTIMATE (query 12239) — note only: report queries do NOT filter bots (team decision 2026-10-12) ──
+  if(loaded.bots){
+    const rows = loaded.bots;
+    const b = topRow(rows)('Web')[0];
+    // show only when the estimate is for the same week as the report
+    if(b && (!D.eng || !D.eng.weekStr || b.week_str===D.eng.weekStr)){
+      D.bots = {web: b, webApps: appRows(rows,'Web')};
+      // previous week's estimate (only if that exact week is loaded) — WoW in the drill-down
+      const prevW = new Date(new Date(b.week_str).getTime()-7*86400000).toISOString().slice(0,10);
+      [b, ...D.bots.webApps].forEach(r=>{
+        const p = rows.find(x=>x.dimension==='Web' && x.app_name===r.app_name && x.week_str===prevW);
+        if(p) r.bots_est_prevwk = p.bots_est;
+      });
+    }
+  }
+
   // ── AUTO ALERTS ──
   D.alerts = generateAlerts(D);
   D.highlights = findHighlights(D);
   D.structural = findStructuralInsights(D);
   D.deepAnalysis = generateDeepAnalysis(D);
+  if(D.bots){
+    const b = D.bots.web;
+    const worst = [...D.bots.webApps].sort((x,y)=>n(y.bots_est)-n(x.bots_est))[0];
+    const worstTxt = worst ? ` Найбільше на ${worst.app_name}: ~${fmtBig(worst.bots_est)} з ${fmtBig(worst.wau_raw)} (${fmt(worst.bots_pct)}%).` : '';
+    D.deepAnalysis.unshift({color:'#fbbf24', title:`Web: у цифрах є боти — приблизно ${fmtBig(b.bots_est)} з ${fmtBig(b.wau_raw)} WAU (${fmt(b.bots_pct)}%)`,
+      body:`Оцінка наближена.${worstTxt} Запити звіту ботів не відфільтровують, тому WAU, нові користувачі, повернення активних юзерів і сесії Web, а також алерти про їх ріст чи спад читайте з цією поправкою. Серед нових користувачів Web ботів приблизно ${fmtBig(b.new_bots_est)} з ${fmtBig(b.new_raw)}.`});
+  }
 
   return D;
 }
@@ -1266,6 +1298,21 @@ function generateAlerts(D){
   // Найгірша апка виміру за WoW WAU поточного тижня (той самий патерн, що вже є в single-week WAU-порогах)
   // Сортуємо за абсолютною зміною (wau - wau_prev), не за %, щоб не обирати дрібну апку з випадково гіршим WoW% замість реального драйвера
   function worstApp(apps){ return apps && apps.length ? [...apps].sort((a,b)=>(n(a.wau)-n(a.wau_prev))-(n(b.wau)-n(b.wau_prev)))[0] : null; }
+  // Найгірша апка за ТЕ САМЕ вікно, що й streak-алерт (перша→остання точка вікна), а не лише за останній тиждень —
+  // інакше в "N-й тиждень поспіль" драйвером виходить апка, що просіла лише цього тижня. Повертає {app_name, abs, pct}.
+  function worstAppInStreak(rows, dimField, dimValue, field, values, s){
+    if(!rows || !rows.length || !values) return null;
+    const weeks = lastWeeks(rows);
+    const idx = values.map((v,i)=>v!=null?i:-1).filter(i=>i>=0).slice(-(s.weeksInARow+1));
+    if(idx.length<2) return null;
+    const wFirst = weeks[idx[0]], wLast = weeks[idx[idx.length-1]];
+    const first = {};
+    rows.forEach(r=>{ if(r[dimField]===dimValue && r.app_name!=='' && r.week_str===wFirst) first[r.app_name]=n(r[field]); });
+    const cand = rows.filter(r=>r[dimField]===dimValue && r.app_name!=='' && r.week_str===wLast && first[r.app_name]!=null)
+      .map(r=>{ const v1=first[r.app_name], v2=n(r[field]); return {app_name:r.app_name, abs:v2-v1, pct:v1>0?(v2-v1)/v1*100:null}; });
+    return cand.length ? cand.sort((a,b)=>a.abs-b.abs)[0] : null;
+  }
+  function streakWorstStr(w, weeksN){ return w ? ` — найбільший внесок за ${weeksN} тижні: ${w.app_name} (${fmtBig(w.abs)}${w.pct!=null?', '+pct(w.pct):''})` : ''; }
   // Пости vs коментарі — яка поверхня домінує в likes цього виміру (щоб текст алерту сам пояснював, що саме впало)
   function dominantSurfaceTxt(dim){
     const c = D.react && D.react[dim];
@@ -1291,8 +1338,7 @@ function generateAlerts(D){
         const color = rp!=null && Math.abs(rp)>5 ? 'red' : 'gray';
         const full = fullRelPct(t.clubs_wau);
         const ctx = full!=null && full>0 ? `, але загалом за ${t.clubs_wau.filter(v=>v!=null).length} тижні +${full.toFixed(1)}% — корекція після зростання` : '';
-        const worst = color==='red' ? worstApp(D.eng.clubApps) : null;
-        const worstStr = worst ? ` — найбільший внесок: ${worst.app_name} (${fmtBig(n(worst.wau)-n(worst.wau_prev))}, ${pct(worst.wau_wow_pct)})` : '';
+        const worstStr = color==='red' ? streakWorstStr(worstAppInStreak(loaded.engagement,'dimension','Clubs','wau',t.clubs_wau,clubsWauStreak), clubsWauStreak.weeksInARow+1) : '';
         alerts.push({type:color, text:`Clubs WAU поступово слабшає ${clubsWauStreak.weeksInARow+1}-й тиждень поспіль${mag}${ctx}${worstStr}`});
         regStreak('clubs_wau', alerts[alerts.length-1]);
       }
@@ -1315,8 +1361,7 @@ function generateAlerts(D){
         const isCorrection = full!=null && full>0;
         const color = isCorrection ? 'gray' : (rp!=null && Math.abs(rp)>5 ? 'red' : 'gray');
         const ctx = isCorrection ? `, але загалом за ${t.flagman_wau.filter(v=>v!=null).length} тижні +${full.toFixed(1)}% — корекція після зростання` : '';
-        const worst = color==='red' ? worstApp(D.eng.flagmanApps) : null;
-        const worstStr = worst ? ` — найбільший внесок: ${worst.app_name} (${fmtBig(n(worst.wau)-n(worst.wau_prev))}, ${pct(worst.wau_wow_pct)})` : '';
+        const worstStr = color==='red' ? streakWorstStr(worstAppInStreak(loaded.engagement,'dimension','Flagman','wau',t.flagman_wau,flagmanWauStreak), flagmanWauStreak.weeksInARow+1) : '';
         alerts.push({type:color, text:`Flagman WAU поступово знижується ${flagmanWauStreak.weeksInARow+1}-й тиждень поспіль${mag}${ctx}${worstStr}`});
         regStreak('flagman_wau', alerts[alerts.length-1]);
       }
@@ -1335,8 +1380,7 @@ function generateAlerts(D){
         const isCorrection = full!=null && full>0;
         const color = isCorrection ? 'gray' : (rp!=null && Math.abs(rp)>5 ? 'red' : 'gray');
         const ctx = isCorrection ? `, але загалом за ${t.league_wau.filter(v=>v!=null).length} тижні +${full.toFixed(1)}% — корекція після зростання` : '';
-        const worst = color==='red' ? worstApp(D.eng.leagueApps) : null;
-        const worstStr = worst ? ` — найбільший внесок: ${worst.app_name} (${fmtBig(n(worst.wau)-n(worst.wau_prev))}, ${pct(worst.wau_wow_pct)})` : '';
+        const worstStr = color==='red' ? streakWorstStr(worstAppInStreak(loaded.engagement,'dimension','League','wau',t.league_wau,leagueWauStreak), leagueWauStreak.weeksInARow+1) : '';
         alerts.push({type:color, text:`League WAU поступово знижується ${leagueWauStreak.weeksInARow+1}-й тиждень поспіль${mag}${ctx}${worstStr}`});
         regStreak('league_wau', alerts[alerts.length-1]);
       }
@@ -1348,8 +1392,7 @@ function generateAlerts(D){
       const mag = rp!=null ? ` (${streakFromTo(t.web_wau,webWauStreak,fmtBig)}, ${rp>0?'+':''}${rp.toFixed(1)}% за ${webWauStreak.weeksInARow+1} тижні)` : '';
       if(webWauStreak.direction<0){
         const color = rp!=null && Math.abs(rp)>5 ? 'red' : 'gray';
-        const worst = color==='red' ? worstApp(D.eng.webApps) : null;
-        const worstStr = worst ? ` — найбільший внесок: ${worst.app_name} (${fmtBig(n(worst.wau)-n(worst.wau_prev))}, ${pct(worst.wau_wow_pct)})` : '';
+        const worstStr = color==='red' ? streakWorstStr(worstAppInStreak(loaded.engagement,'dimension','Web','wau',t.web_wau,webWauStreak), webWauStreak.weeksInARow+1) : '';
         alerts.push({type:color, text:`Web WAU знижується ${webWauStreak.weeksInARow+1}-й тиждень поспіль${mag}${worstStr}`});
         regStreak('web_wau', alerts[alerts.length-1]);
       }
@@ -1491,8 +1534,7 @@ function generateAlerts(D){
       const mag = rp!=null ? ` (${streakFromTo(t[key],s,fmtBig)}, ${rp>0?'+':''}${rp.toFixed(1)}% за ${s.weeksInARow+1} тижні)` : '';
       if(s.direction<0){
         const color = rp!=null && Math.abs(rp)>5 ? 'red' : 'gray';
-        const worst = color==='red' ? worstInstallApp(apps) : null;
-        const worstStr = worst ? ` — найбільший внесок: ${worst.app_name} (${fmtBig(worst.abs)}, ${pct(worst.wow)})` : '';
+        const worstStr = color==='red' ? streakWorstStr(worstAppInStreak(loaded.retention,'grp',label,'installs',t[key],s), s.weeksInARow+1) : '';
         alerts.push({type:color, text:`${label} ${word} знижуються ${s.weeksInARow+1}-й тиждень поспіль${mag}${worstStr}`});
         regStreak(key, alerts[alerts.length-1]);
       } else {
@@ -2147,6 +2189,7 @@ function renderReport(D){
         <div class="mr"><span class="ml">MAU trailing</span><span class="mv drill-trigger" onclick="openDrill('MAU trailing','${label}', window.reportData.eng.${appsKeyMap[dim]}, 'mau_trailing', {})">${fmtBig(r.mau_trailing)}</span></div>
         <div class="mr"><span class="ml">Sticky WAU/MAU</span><span class="mv drill-trigger" onclick="openDrill('Sticky WAU/MAU','${label}', window.reportData.eng.${appsKeyMap[dim]}, 'wau_mau_pct', {isPct:true})">${fmt(r.wau_mau_pct)}%</span></div>
         <div class="mr"><span class="ml">Sessions</span><span class="mv drill-trigger" onclick="openDrill('Sessions','${label}', window.reportData.eng.${appsKeyMap[dim]}, 'sessions', {wowField:'sessions_wow_pct'})">${fmtBig(r.sessions)} <span class="${colorClass(r.sessions_wow_pct)}">${pct(r.sessions_wow_pct)}</span></span></div>
+        ${dim==='web'&&D.bots?`<div class="mr"><span class="ml">Боти у WAU (оцінка)</span><span class="mv" style="color:#fbbf24" title="Приблизна кількість ботів у WAU Web. Запити звіту їх не відфільтровують."><span class="drill-trigger" onclick="openDrill('Боти у WAU (оцінка)','${label}', window.reportData.bots.webApps, 'bots_est', {prevField:'bots_est_prevwk'})">~${fmtBig(D.bots.web.bots_est)}</span> · <span class="drill-trigger" onclick="openDrill('Частка ботів у WAU (оцінка)','${label}', window.reportData.bots.webApps, 'bots_pct', {isPct:true})">${fmt(D.bots.web.bots_pct)}%</span></span></div>`:''}
         ${topApp?`<div style="border-top:1px solid #252836;margin:10px 0"></div><div class="mr"><span class="ml">${topLabelMap[dim]}</span><span class="mv" style="font-size:11px">${topApp.app_name} &nbsp;${fmtBig(topApp.wau)} <span class="${colorClass(topApp.wau_wow_pct)}">${pct(topApp.wau_wow_pct)}</span> <span style="color:#6b7280;font-size:10px">${n(r.wau)>0?(n(topApp.wau)/n(r.wau)*100).toFixed(0)+'% WAU':''}</span></span></div>`:''}
       </div>`;
     });
@@ -2157,7 +2200,11 @@ function renderReport(D){
       const apps = (D.eng[appsKeyMap[cfg.dim]]||[]).slice().sort((a,b)=>n(b.wau)-n(a.wau));
       const list = cfg.limit ? apps.slice(0,cfg.limit) : apps;
       html += `<div class="card"><div class="ct" style="color:${gc[cfg.dim]}">${cfg.lbl}</div>`;
-      list.forEach(r=>{ html += `<div class="mr"><span class="ml" style="color:#e8eaf0">${r.app_name}</span><span class="mv">${fmtBig(r.wau)} <span class="${colorClass(r.wau_wow_pct)}">${pct(r.wau_wow_pct)}</span></span></div>`; });
+      list.forEach(r=>{
+        const bot = cfg.dim==='web' && D.bots ? D.bots.webApps.find(x=>x.app_name===r.app_name) : null;
+        const botTxt = bot ? ` <span style="color:#fbbf24;font-size:10px" title="Приблизна частка ботів у WAU сайту">боти ~${fmt(bot.bots_pct)}%</span>` : '';
+        html += `<div class="mr"><span class="ml" style="color:#e8eaf0">${r.app_name}</span><span class="mv">${fmtBig(r.wau)} <span class="${colorClass(r.wau_wow_pct)}">${pct(r.wau_wow_pct)}</span>${botTxt}</span></div>`;
+      });
       html += '</div>';
     });
     html += '</div>';
@@ -2248,7 +2295,7 @@ function renderReport(D){
   if(D.active){
     html += '<div class="section-label">Залучена аудиторія % від WAU</div>';
     html += '<div class="card" style="margin-bottom:12px">';
-    html += '<div style="font-size:10px;color:#6b7280;line-height:1.4;margin-bottom:12px">% від WAU, хто зробив ХОЧ ОДНУ дію (комент/реакція/фолов/тред/пост/блог/опитування/чат) за тиждень — все, крім чистого перегляду</div>';
+    html += '<div style="font-size:10px;color:#6b7280;line-height:1.4;margin-bottom:12px">% від WAU, хто зробив ХОЧ ОДНУ дію (комент/реакція/фолов/тред/пост/блог/опитування/чат/реакція в чаті) за тиждень — все, крім чистого перегляду</div>';
     html += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px">';
     const activeTipCats = [
       {lbl:'Commentators',         key:'comment'},
@@ -2259,6 +2306,7 @@ function renderReport(D){
       {lbl:'Users with Reactions', key:'reaction'},
       {lbl:'Users with Follows',   key:'follow'},
       {lbl:'Poll/Match voters',    key:'poll_match'},
+      {lbl:'Chat reactors',        key:'chat_reaction'},
     ];
     gcArr.forEach(([dim,lbl])=>{
       const r=D.active[dim]||{};
@@ -2295,12 +2343,14 @@ function renderReport(D){
       {lbl:'Users with Reactions',   key:'reaction',     totalLabel:'реакцій всього', total:dim=>D.react&&D.react[dim]?n(D.react[dim].likes_total)+n(D.react[dim].dislikes_total):null},
       {lbl:'Users with Follows',     key:'follow',       totalLabel:'підписок всього', total:dim=>D.active&&D.active[dim]?n(D.active[dim].follow_total):null},
       {lbl:'Poll/Match voters',      key:'poll_match',   totalLabel:'голосів всього', total:dim=>D.react&&D.react[dim]?n(D.react[dim].poll_votes)+n(D.react[dim].match_votes):null},
+      {lbl:'Chat reactors',          key:'chat_reaction', totalLabel:'реакцій у чатах всього (лише iOS з 30.09)', total:dim=>D.react&&D.react[dim]&&D.react[dim].chat_reactions!=null?D.react[dim].chat_reactions:null},
     ];
     activeRows.forEach(rd=>{
       html += '<div style="display:grid;grid-template-columns:150px repeat(4,1fr);gap:8px;margin-bottom:8px">';
       html += `<div style="display:flex;align-items:center;font-size:10px;color:#9ca3af">${rd.lbl}</div>`;
       gcArr.forEach(([dim,lbl])=>{
         const r=D.active[dim]||{};
+        if(r[rd.key+'_pct']===undefined){ html += `<div style="background:#1e2130;border-radius:8px;padding:8px 12px;display:flex;align-items:center;justify-content:center;color:#4b5563;font-size:11px">N/A</div>`; return; }
         const pctVal=n(r[rd.key+'_pct']);
         const catUsers=n(r[rd.key+'_users']), catWaus=n(r.waus);
         const wowPP=r[rd.key+'_wow_pp'];
@@ -2404,11 +2454,12 @@ function renderReport(D){
       {lbl:'% дизлайків', tf:'dislike_share', field:null, wowField:null, vf:dim=>{ const r=D.react[dim], l=n(r.likes_posts),d=n(r.dislikes_posts), total=l+d; const share=total>0?d/total*100:null; return {val:share!=null?share.toFixed(1)+'%':'N/A',wow:null,warn:share!=null&&share>18}; }},
       {lbl:'Content-опитування', tf:'polls', field:'poll_votes', wowField:'polls_wow_pct', vf:dim=>({val:fmtBig(n(D.react[dim].poll_votes)),      wow:n(D.react[dim].polls_wow_pct)})},
       {lbl:'Хто переможе? (матчі)', tf:'match', field:'match_votes', wowField:'match_votes_wow_pct', vf:dim=>({val:fmtBig(n(D.react[dim].match_votes)),      wow:n(D.react[dim].match_votes_wow_pct)})},
+      {lbl:'Реакції в чатах', tf:'chat_reactions', field:'chat_reactions', wowField:'chat_reactions_wow_pct', vf:dim=>{ const r=D.react[dim]; if(r.chat_reactions==null) return {val:'N/A',wow:null}; const w=r.chat_reactions_wow_pct; return {val:fmtBig(r.chat_reactions), wow:(w!=null&&w!=='')?n(w):null, tip:`👍 ${fmtBig(n(r.chat_likes))} · 👎 ${fmtBig(n(r.chat_dislikes))} · ${fmtBig(n(r.chat_reacting_users))} юзерів (лише iOS з 30.09)`}; }},
     ].forEach(rd=>{
       html += '<div style="display:grid;grid-template-columns:130px repeat(4,1fr);gap:8px;margin-bottom:6px">';
       html += `<div style="display:flex;align-items:center;font-size:10px;color:#9ca3af">${rd.lbl}</div>`;
       gcArr.forEach(([dim,lbl])=>{
-        const {val,wow,warn}=rd.vf(dim);
+        const {val,wow,warn,tip}=rd.vf(dim);
         let tv;
         if(rd.tf==='dislike_share'){
           const lp=D.react.trends[dim+'_likes_posts'], dp=D.react.trends[dim+'_dislikes_posts'];
@@ -2418,7 +2469,7 @@ function renderReport(D){
         }
         const spark = tv ? sparkline(tv, gc[dim], 56, 20, D.react.weeks) : '';
         const cellAttrs = rd.field ? ` class="drill-trigger" onclick="openDrill('${rd.lbl}','${lbl}', window.reportData.react.${appsKeyMap[dim]}, '${rd.field}', {wowField:'${rd.wowField}'})"` : '';
-        html += `<div${cellAttrs} style="background:#1e2130;border-radius:8px;padding:8px 10px;border:1px solid #252836;display:flex;align-items:center;justify-content:space-between;gap:6px">
+        html += `<div${cellAttrs}${tip?` title="${tip}"`:''} style="background:#1e2130;border-radius:8px;padding:8px 10px;border:1px solid #252836;display:flex;align-items:center;justify-content:space-between;gap:6px">
           <div>
             <div style="font-family:monospace;font-size:13px;font-weight:700;color:${warn?'#f87171':'#fff'}">${val||'N/A'}</div>
             ${wow!=null?`<div style="font-family:monospace;font-size:10px;color:${wow>=0?'#4ade80':'#f87171'};margin-top:1px">${pct(wow)}</div>`:''}
@@ -2447,6 +2498,7 @@ function renderReport(D){
           <div class="mr"><span class="ml">Dislikes на коментарях</span><span class="mv drill-trigger" onclick="openDrill('Dislikes на коментарях','${lbl}', ${reactApps}, 'dislikes_comments', {prevField:'dislikes_comments_prevwk'})">${fmtBig(rs.dislikesCommentsAbs)} <span style="color:#6b7280;font-weight:400">(${rs.dislikesCommentsShare.toFixed(0)}%)</span>${wowPct(rs.dislikesCommentsAbsWow)}</span></div>
           ${rs.likesThreadsShare>=0.5?`<div class="mr"><span class="ml">Likes на тредах</span><span class="mv drill-trigger" onclick="openDrill('Likes на тредах','${lbl}', ${reactApps}, 'likes_threads', {prevField:'likes_threads_prevwk'})">${fmtBig(rs.likesThreadsAbs)} <span style="color:#6b7280;font-weight:400">(${rs.likesThreadsShare.toFixed(0)}%)</span>${wowPct(rs.likesThreadsAbsWow)}</span></div>`:''}
           ${rs.dislikesThreadsShare>=0.5?`<div class="mr"><span class="ml">Dislikes на тредах</span><span class="mv drill-trigger" onclick="openDrill('Dislikes на тредах','${lbl}', ${reactApps}, 'dislikes_threads', {prevField:'dislikes_threads_prevwk'})">${fmtBig(rs.dislikesThreadsAbs)} <span style="color:#6b7280;font-weight:400">(${rs.dislikesThreadsShare.toFixed(0)}%)</span>${wowPct(rs.dislikesThreadsAbsWow)}</span></div>`:''}
+          ${(()=>{ const cr=D.react&&D.react[dim]; if(!cr||cr.chat_reactions==null||!(cr.chat_reactions>0)) return ''; const w=cr.chat_reactions_wow_pct; return `<div class="mr" title="Реакції в чатах (лише iOS з 30.09) — окремо, не входять у likes/dislikes вище і в їхні %"><span class="ml">Реакції в чатах</span><span class="mv drill-trigger" onclick="openDrill('Реакції в чатах','${lbl}', ${reactApps}, 'chat_reactions', {wowField:'chat_reactions_wow_pct'})">👍 ${fmtBig(n(cr.chat_likes))} · 👎 ${fmtBig(n(cr.chat_dislikes))}${(w!=null&&w!=='')?wowPct(n(w)):''}</span></div>`; })()}
           <div class="mr"><span class="ml">Likes на користувача</span><span class="mv drill-trigger" onclick="openDrill('Likes на користувача','${lbl}', ${reactApps}, r=>n(r.liking_users)>0?n(r.likes_total)/n(r.liking_users):0, {suffix:'×', prevField:r=>n(r.liking_users_prevwk)>0?n(r.likes_total_prevwk)/n(r.liking_users_prevwk):null})">${rs.likesPerUser.toFixed(1)}×${wowPct(rs.likesPerUserWow)}</span></div>
           <div class="mr"><span class="ml">Унікальних лайкерів</span><span class="mv drill-trigger" onclick="openDrill('Унікальних лайкерів','${lbl}', ${reactApps}, 'liking_users', {prevField:'liking_users_prevwk'})">${fmtBig(rs.likingUsers)}${wowPct(rs.likingUsersWow)}</span></div>
           ${rs.pollVoters>0?`<div class="mr"><span class="ml">Унікальних голосуючих</span><span class="mv drill-trigger" onclick="openDrill('Унікальних голосуючих','${lbl}', ${reactApps}, 'poll_voters', {prevField:'poll_voters_prevwk'})">${fmtBig(rs.pollVoters)}${wowPct(rs.pollVotersWow)}</span></div>`:''}
