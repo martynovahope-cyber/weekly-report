@@ -222,6 +222,7 @@ input[type=file]{display:none}
     <div class="file-item" id="fi-active"><div class="file-dot missing" id="fd-active"></div><span class="file-name">Weekly_Active_Audience</span><span class="file-status missing" id="fs-active">очікується</span></div>
     <div class="file-item" id="fi-sessions"><div class="file-dot missing" id="fd-sessions"></div><span class="file-name">Weekly_Sessions (query 12169)</span><span class="file-status missing" id="fs-sessions">очікується</span></div>
     <div class="file-item" id="fi-bots"><div class="file-dot missing" id="fd-bots"></div><span class="file-name">Weekly_Web_Bots_Estimate (query 12239, необов'язково)</span><span class="file-status missing" id="fs-bots">очікується</span></div>
+    <div class="file-item" id="fi-webroles"><div class="file-dot missing" id="fd-webroles"></div><span class="file-name">Weekly_Web_Reactions_by_Role (query 12302, необов'язково)</span><span class="file-status missing" id="fs-webroles">очікується</span></div>
   </div>
 
   <button class="generate-btn" id="gen-btn" disabled onclick="buildReport()">Генерувати звіт →</button>
@@ -496,7 +497,8 @@ const FILE_MAP = {
   'funnel-wau': /Funnel_Active|Engagement_Depth_Active/i,
   'active':     /Active.?Audience/i,
   'sessions':   /Weekly_Sessions/i,
-  'bots':       /Web_Bots/i
+  'bots':       /Web_Bots/i,
+  'webroles':   /Web_Reactions_by_Role/i
 };
 
 const loaded = {};
@@ -622,7 +624,7 @@ function weekLabelOf(ws){
 function reportWeeks(){
   let common = null;
   Object.keys(loaded).forEach(k=>{
-    if(k==='retention') return;
+    if(k==='retention' || k==='webroles') return;
     const ws = new Set((loaded[k]||[]).map(r=>r.week_str).filter(Boolean));
     common = common ? new Set([...common].filter(w=>ws.has(w))) : ws;
   });
@@ -1059,7 +1061,37 @@ function analyzeAll(){
   // ── REACTIONS ──
   if(loaded.reactions){
     const rows = loaded.reactions;
-    // Реакції в чатах (chat_likes/chat_dislikes, query 11690 з 19.10.2026; iOS з 30.09.2026). У старих CSV колонок нема:
+    // Web: реальні користувачі окремо від модераторів (query 12302, з 02.11.2026). Цифри реальних підміняють колонки
+    // 11690 у Web-рядках, тож картки, drill-down, тренди й алерти Web далі рахують реальних; модератори лишаються в mod_*.
+    // Застосовується лише коли є всі тижні, інакше тренд змішав би дві бази.
+    if(loaded.webroles){
+      const roleKey = r => r.week_str+'|'+r.app_name;
+      const roleMap = {};
+      loaded.webroles.forEach(r=>{ if(r.dimension==='Web') roleMap[roleKey(r)] = r; });
+      const webRows = rows.filter(r=>r.dimension==='Web');
+      const missing = [...new Set(webRows.filter(r=>r.app_name==='' && !roleMap[roleKey(r)]).map(r=>r.week_str))].sort();
+      D.webRoles = {missingWeeks: missing, applied: missing.length===0};
+      if(D.webRoles.applied){
+        const wowOf = (cur,prev) => n(prev)>0 ? Math.round((n(cur)-n(prev))/n(prev)*1000)/10 : '';
+        webRows.forEach(r=>{
+          const m = roleMap[roleKey(r)];
+          if(!m) return;
+          ['likes','dislikes'].forEach(kind=>{
+            ['total','posts','comments','threads'].forEach(f=>{
+              r[kind+'_'+f] = m['real_'+kind+'_'+f];
+              r['mod_'+kind+'_'+f] = m['mod_'+kind+'_'+f];
+            });
+            r[kind+'_total_prev'] = m['real_'+kind+'_total_prev'];
+            r[kind+'_wow_pct'] = wowOf(m['real_'+kind+'_total'], m['real_'+kind+'_total_prev']);
+            r['mod_'+kind+'_wow_pct'] = wowOf(m['mod_'+kind+'_total'], m['mod_'+kind+'_total_prev']);
+          });
+          r.liking_users = m.real_liking_users;
+          r.disliking_users = m.real_disliking_users;
+          r.mod_liking_users = m.mod_liking_users;
+        });
+      }
+    }
+    // Реакції в чатах (chat_likes/chat_dislikes, query 11690 з 19.10.2026; iOS з 30.09.2026, Android з 26.10.2026). У старих CSV колонок нема:
     // до тижня релізу це справжній 0, після — дані невідомі (null, щоб не малювати фейковий 0).
     rows.forEach(r=>{
       if(r.chat_likes!==undefined) r.chat_reactions = n(r.chat_likes)+n(r.chat_dislikes);
@@ -1118,6 +1150,7 @@ function analyzeAll(){
           [['likes_total','likes'],['dislikes_total','dislikes'],['likes_posts','likes_posts'],['dislikes_posts','dislikes_posts'],['poll_votes','polls'],['match_votes','match']].forEach(([field,key])=>{
             t[dim+'_'+key]=metricTrend(ws,field);
           });
+          if(dim==='web' && D.webRoles && D.webRoles.applied){ t.web_mod_likes=metricTrend(ws,'mod_likes_total'); t.web_mod_dislikes=metricTrend(ws,'mod_dislikes_total'); }
           t[dim+'_chat_reactions'] = ws.weeks.map(w=>{ const r=ws.series[w]; return r && r.chat_reactions!=null ? r.chat_reactions : null; });
         });
         return t;
@@ -2343,7 +2376,7 @@ function renderReport(D){
       {lbl:'Users with Reactions',   key:'reaction',     totalLabel:'реакцій всього', total:dim=>D.react&&D.react[dim]?n(D.react[dim].likes_total)+n(D.react[dim].dislikes_total):null},
       {lbl:'Users with Follows',     key:'follow',       totalLabel:'підписок всього', total:dim=>D.active&&D.active[dim]?n(D.active[dim].follow_total):null},
       {lbl:'Poll/Match voters',      key:'poll_match',   totalLabel:'голосів всього', total:dim=>D.react&&D.react[dim]?n(D.react[dim].poll_votes)+n(D.react[dim].match_votes):null},
-      {lbl:'Chat reactors',          key:'chat_reaction', totalLabel:'реакцій у чатах всього (лише iOS з 30.09)', total:dim=>D.react&&D.react[dim]&&D.react[dim].chat_reactions!=null?D.react[dim].chat_reactions:null},
+      {lbl:'Chat reactors',          key:'chat_reaction', totalLabel:'реакцій у чатах всього (iOS з 30.09, Android з 26.10)', total:dim=>D.react&&D.react[dim]&&D.react[dim].chat_reactions!=null?D.react[dim].chat_reactions:null},
     ];
     activeRows.forEach(rd=>{
       html += '<div style="display:grid;grid-template-columns:150px repeat(4,1fr);gap:8px;margin-bottom:8px">';
@@ -2443,75 +2476,65 @@ function renderReport(D){
   // ── #25928: Social Reactions ──
   if(D.react){
     html += '<div class="section-label">Соціальна активність</div>';
-    // Row 1: summary chip matrix (full width)
-    html += '<div class="card" style="margin-bottom:12px"><div class="ct">Реакції</div>';
-    html += '<div style="display:grid;grid-template-columns:130px repeat(4,1fr);gap:8px;margin-bottom:6px"><div></div>';
-    gcArr.forEach(([dim,lbl])=>{ html += `<div style="font-size:10px;font-weight:600;color:${gc[dim]};text-align:center">${lbl}</div>`; });
-    html += '</div>';
-    [
-      {lbl:'Likes',      tf:'likes',    field:'likes_total',    wowField:'likes_wow_pct',    vf:dim=>({val:fmtBig(n(D.react[dim].likes_total)),    wow:n(D.react[dim].likes_wow_pct)})},
-      {lbl:'Dislikes',   tf:'dislikes', field:'dislikes_total', wowField:'dislikes_wow_pct', vf:dim=>({val:fmtBig(n(D.react[dim].dislikes_total)), wow:n(D.react[dim].dislikes_wow_pct)})},
-      {lbl:'% дизлайків', tf:'dislike_share', field:null, wowField:null, vf:dim=>{ const r=D.react[dim], l=n(r.likes_posts),d=n(r.dislikes_posts), total=l+d; const share=total>0?d/total*100:null; return {val:share!=null?share.toFixed(1)+'%':'N/A',wow:null,warn:share!=null&&share>18}; }},
-      {lbl:'Content-опитування', tf:'polls', field:'poll_votes', wowField:'polls_wow_pct', vf:dim=>({val:fmtBig(n(D.react[dim].poll_votes)),      wow:n(D.react[dim].polls_wow_pct)})},
-      {lbl:'Хто переможе? (матчі)', tf:'match', field:'match_votes', wowField:'match_votes_wow_pct', vf:dim=>({val:fmtBig(n(D.react[dim].match_votes)),      wow:n(D.react[dim].match_votes_wow_pct)})},
-      {lbl:'Реакції в чатах', tf:'chat_reactions', field:'chat_reactions', wowField:'chat_reactions_wow_pct', vf:dim=>{ const r=D.react[dim]; if(r.chat_reactions==null) return {val:'N/A',wow:null}; const w=r.chat_reactions_wow_pct; return {val:fmtBig(r.chat_reactions), wow:(w!=null&&w!=='')?n(w):null, tip:`👍 ${fmtBig(n(r.chat_likes))} · 👎 ${fmtBig(n(r.chat_dislikes))} · ${fmtBig(n(r.chat_reacting_users))} юзерів (лише iOS з 30.09)`}; }},
-    ].forEach(rd=>{
-      html += '<div style="display:grid;grid-template-columns:130px repeat(4,1fr);gap:8px;margin-bottom:6px">';
-      html += `<div style="display:flex;align-items:center;font-size:10px;color:#9ca3af">${rd.lbl}</div>`;
-      gcArr.forEach(([dim,lbl])=>{
-        const {val,wow,warn,tip}=rd.vf(dim);
-        let tv;
-        if(rd.tf==='dislike_share'){
-          const lp=D.react.trends[dim+'_likes_posts'], dp=D.react.trends[dim+'_dislikes_posts'];
-          if(lp && dp) tv = lp.map((l,i)=>{ const d=dp[i]; if(l==null||d==null) return null; const tot=l+d; return tot>0 ? d/tot*100 : null; });
-        } else {
-          tv = D.react.trends[dim+'_'+rd.tf];
-        }
-        const spark = tv ? sparkline(tv, gc[dim], 56, 20, D.react.weeks) : '';
-        const cellAttrs = rd.field ? ` class="drill-trigger" onclick="openDrill('${rd.lbl}','${lbl}', window.reportData.react.${appsKeyMap[dim]}, '${rd.field}', {wowField:'${rd.wowField}'})"` : '';
-        html += `<div${cellAttrs}${tip?` title="${tip}"`:''} style="background:#1e2130;border-radius:8px;padding:8px 10px;border:1px solid #252836;display:flex;align-items:center;justify-content:space-between;gap:6px">
-          <div>
-            <div style="font-family:monospace;font-size:13px;font-weight:700;color:${warn?'#f87171':'#fff'}">${val||'N/A'}</div>
-            ${wow!=null?`<div style="font-family:monospace;font-size:10px;color:${wow>=0?'#4ade80':'#f87171'};margin-top:1px">${pct(wow)}</div>`:''}
+    // Реакції та взаємодія: одна картка на групу (лайки/дизлайки, частки, пости/коментарі/треди, нижні показники)
+    html += '<div class="g4" style="margin-bottom:6px">';
+    gcArr.forEach(([dim,lbl])=>{
+      const color=gc[dim], r=D.react[dim]||{};
+      const rs=D.structural&&D.structural.reactionSplit&&D.structural.reactionSplit[dim];
+      const apps=`window.reportData.react.${appsKeyMap[dim]}`;
+      const webReal=dim==='web'&&D.webRoles&&D.webRoles.applied;
+      const wowTxt=(v,inv)=>(v==null||v==='')?'':`<span style="font-family:monospace;font-size:10px;color:${(inv?n(v)<0:n(v)>=0)?'#4ade80':'#f87171'}">${pct(n(v))}</span>`;
+      const hero=(title,field,wowField,key)=>{
+        const tv=D.react.trends[dim+'_'+key];
+        const spark=tv?sparkline(tv,color,48,20,D.react.weeks):'';
+        return `<div class="drill-trigger" onclick="openDrill('${title}','${lbl}', ${apps}, '${field}', {wowField:'${wowField}'})" style="background:#1e2130;border:1px solid #252836;border-radius:8px;padding:7px 8px;display:flex;align-items:center;justify-content:space-between;gap:4px;min-width:0">
+          <div style="min-width:0">
+            <div style="font-size:10px;color:#9ca3af">${title}</div>
+            <div style="font-family:monospace;font-size:14px;font-weight:700;color:#fff">${fmtBig(n(r[field]))}</div>
+            ${wowTxt(r[wowField])}
           </div>
           ${spark?`<div style="flex-shrink:0">${spark}</div>`:''}
         </div>`;
-      });
-      html += '</div>';
-    });
-    html += '<div style="font-size:10px;color:#9ca3af;margin-top:-1px">% дизлайків — тільки на постах (не коментарях/тредах), бенчмарк ~15-18%</div>';
-    html += '</div>';
-    // Row 1b: де відбувається взаємодія × 4 (лайки/дизлайки)
-    html += '<div class="g4">';
-    gcArr.forEach(([dim,lbl])=>{
-      const rs=D.structural&&D.structural.reactionSplit&&D.structural.reactionSplit[dim];
-      html += `<div class="card"><div class="ct" style="color:${gc[dim]}">Де відбувається взаємодія (${lbl.toUpperCase()})</div>`;
+      };
+      const cell=(title,val,wow,field,inv)=>`<span class="drill-trigger" onclick="openDrill('${title}','${lbl}', ${apps}, '${field}', {prevField:'${field}_prevwk'})" style="font-family:monospace;font-size:11px;font-weight:600;color:#fff;white-space:nowrap">${fmtBig(val)} ${wowTxt(wow,inv)}</span>`;
+      const row=(name,a,b)=>`<div style="display:grid;grid-template-columns:minmax(0,1fr) 94px 94px;align-items:baseline;padding:5px 0;border-bottom:1px solid #1e2130;font-size:12px">
+          <span style="color:#9ca3af">${name}</span><span style="text-align:right">${a}</span><span style="text-align:right">${b}</span>
+        </div>`;
+      html += `<div class="card"><div class="ct" style="color:${color};display:flex;justify-content:space-between;align-items:center">${lbl}${webReal?'<span style="background:#1e2a44;color:#93c5fd;font-size:10px;font-weight:500;padding:1px 6px;border-radius:6px;letter-spacing:0;text-transform:none" title="Без акаунтів із роллю moderator_*">реальні</span>':''}</div>`;
+      html += `<div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;margin-bottom:10px">${hero('Likes','likes_total','likes_wow_pct','likes')}${hero('Dislikes','dislikes_total','dislikes_wow_pct','dislikes')}</div>`;
       if(rs){
-        const dom=rs.dominantSurface;
-        const domShare = ({'коментарі':rs.likesCommentsShare,'пости':rs.likesPostsShare,'треди':rs.likesThreadsShare})[dom.name]||0;
-        const wowPct = v => v!=null ? ` <span style="font-size:10px;font-weight:600;color:${v>=0?'#4ade80':'#f87171'}">${pct(v)}</span>` : '';
-        const wowPctInv = v => v!=null ? ` <span style="font-size:10px;font-weight:600;color:${v>=0?'#f87171':'#4ade80'}">${pct(v)}</span>` : '';
-        const reactApps = `window.reportData.react.${appsKeyMap[dim]}`;
-        html += `<div class="mr"><span class="ml">Likes на постах</span><span class="mv drill-trigger" onclick="openDrill('Likes на постах','${lbl}', ${reactApps}, 'likes_posts', {prevField:'likes_posts_prevwk'})">${fmtBig(rs.likesPostsAbs)} <span style="color:#6b7280;font-weight:400">(${rs.likesPostsShare.toFixed(0)}%)</span>${wowPct(rs.likesPostsAbsWow)}</span></div>
-          <div class="mr"><span class="ml">Dislikes на постах</span><span class="mv drill-trigger" onclick="openDrill('Dislikes на постах','${lbl}', ${reactApps}, 'dislikes_posts', {prevField:'dislikes_posts_prevwk'})">${fmtBig(rs.dislikesPostsAbs)} <span style="color:#6b7280;font-weight:400">(${rs.dislikesPostsShare.toFixed(0)}%)</span>${wowPctInv(rs.dislikesPostsAbsWow)}</span></div>
-          <div class="mr"><span class="ml">Likes на коментарях</span><span class="mv drill-trigger" onclick="openDrill('Likes на коментарях','${lbl}', ${reactApps}, 'likes_comments', {prevField:'likes_comments_prevwk'})">${fmtBig(rs.likesCommentsAbs)} <span style="color:#6b7280;font-weight:400">(${rs.likesCommentsShare.toFixed(0)}%)</span>${wowPct(rs.likesCommentsAbsWow)}</span></div>
-          <div class="mr"><span class="ml">Dislikes на коментарях</span><span class="mv drill-trigger" onclick="openDrill('Dislikes на коментарях','${lbl}', ${reactApps}, 'dislikes_comments', {prevField:'dislikes_comments_prevwk'})">${fmtBig(rs.dislikesCommentsAbs)} <span style="color:#6b7280;font-weight:400">(${rs.dislikesCommentsShare.toFixed(0)}%)</span>${wowPct(rs.dislikesCommentsAbsWow)}</span></div>
-          ${rs.likesThreadsShare>=0.5?`<div class="mr"><span class="ml">Likes на тредах</span><span class="mv drill-trigger" onclick="openDrill('Likes на тредах','${lbl}', ${reactApps}, 'likes_threads', {prevField:'likes_threads_prevwk'})">${fmtBig(rs.likesThreadsAbs)} <span style="color:#6b7280;font-weight:400">(${rs.likesThreadsShare.toFixed(0)}%)</span>${wowPct(rs.likesThreadsAbsWow)}</span></div>`:''}
-          ${rs.dislikesThreadsShare>=0.5?`<div class="mr"><span class="ml">Dislikes на тредах</span><span class="mv drill-trigger" onclick="openDrill('Dislikes на тредах','${lbl}', ${reactApps}, 'dislikes_threads', {prevField:'dislikes_threads_prevwk'})">${fmtBig(rs.dislikesThreadsAbs)} <span style="color:#6b7280;font-weight:400">(${rs.dislikesThreadsShare.toFixed(0)}%)</span>${wowPct(rs.dislikesThreadsAbsWow)}</span></div>`:''}
-          ${(()=>{ const cr=D.react&&D.react[dim]; if(!cr||cr.chat_reactions==null||!(cr.chat_reactions>0)) return ''; const w=cr.chat_reactions_wow_pct; return `<div class="mr" title="Реакції в чатах (лише iOS з 30.09) — окремо, не входять у likes/dislikes вище і в їхні %"><span class="ml">Реакції в чатах</span><span class="mv drill-trigger" onclick="openDrill('Реакції в чатах','${lbl}', ${reactApps}, 'chat_reactions', {wowField:'chat_reactions_wow_pct'})">👍 ${fmtBig(n(cr.chat_likes))} · 👎 ${fmtBig(n(cr.chat_dislikes))}${(w!=null&&w!=='')?wowPct(n(w)):''}</span></div>`; })()}
-          <div class="mr"><span class="ml">Likes на користувача</span><span class="mv drill-trigger" onclick="openDrill('Likes на користувача','${lbl}', ${reactApps}, r=>n(r.liking_users)>0?n(r.likes_total)/n(r.liking_users):0, {suffix:'×', prevField:r=>n(r.liking_users_prevwk)>0?n(r.likes_total_prevwk)/n(r.liking_users_prevwk):null})">${rs.likesPerUser.toFixed(1)}×${wowPct(rs.likesPerUserWow)}</span></div>
-          <div class="mr"><span class="ml">Унікальних лайкерів</span><span class="mv drill-trigger" onclick="openDrill('Унікальних лайкерів','${lbl}', ${reactApps}, 'liking_users', {prevField:'liking_users_prevwk'})">${fmtBig(rs.likingUsers)}${wowPct(rs.likingUsersWow)}</span></div>
-          ${rs.pollVoters>0?`<div class="mr"><span class="ml">Унікальних голосуючих</span><span class="mv drill-trigger" onclick="openDrill('Унікальних голосуючих','${lbl}', ${reactApps}, 'poll_voters', {prevField:'poll_voters_prevwk'})">${fmtBig(rs.pollVoters)}${wowPct(rs.pollVotersWow)}</span></div>`:''}
-          <div style="display:flex;align-items:flex-start;gap:8px;margin-top:12px;background:#1c1a0e;border:1px solid #78350f;border-radius:8px;padding:10px 12px">
-            <span style="color:#fbbf24;font-size:14px;flex-shrink:0">ℹ</span>
-            <span style="font-size:11px;color:#fde68a;line-height:1.4">Основна арена взаємодії — ${dom.name} (${domShare.toFixed(0)}% лайків)</span>
-          </div>`;
+        html += `<div style="display:flex;height:6px;border-radius:3px;overflow:hidden;gap:1px;margin-bottom:3px" title="Частки лайків за типом контенту">
+            <div style="width:${rs.likesPostsShare}%;background:${color};opacity:.45"></div>
+            <div style="width:${rs.likesCommentsShare}%;background:${color}"></div>
+            <div style="width:${rs.likesThreadsShare}%;background:${color};opacity:.7"></div>
+          </div>
+          <div style="font-size:10px;color:#9ca3af;margin-bottom:8px">Лайки: пости ${rs.likesPostsShare.toFixed(0)}% · коментарі ${rs.likesCommentsShare.toFixed(0)}% · треди ${rs.likesThreadsShare.toFixed(0)}%</div>`;
+        html += row('','<span style="font-size:13px" title="Лайки">👍</span>','<span style="font-size:13px" title="Дизлайки">👎</span>');
+        html += row('Пости',cell('Likes на постах',rs.likesPostsAbs,rs.likesPostsAbsWow,'likes_posts'),cell('Dislikes на постах',rs.dislikesPostsAbs,rs.dislikesPostsAbsWow,'dislikes_posts',true));
+        html += row('Коментарі',cell('Likes на коментарях',rs.likesCommentsAbs,rs.likesCommentsAbsWow,'likes_comments'),cell('Dislikes на коментарях',rs.dislikesCommentsAbs,rs.dislikesCommentsAbsWow,'dislikes_comments'));
+        html += row('Треди',cell('Likes на тредах',rs.likesThreadsAbs,rs.likesThreadsAbsWow,'likes_threads'),cell('Dislikes на тредах',rs.dislikesThreadsAbs,rs.dislikesThreadsAbsWow,'dislikes_threads'));
+        const lp=n(r.likes_posts), dp=n(r.dislikes_posts), share=(lp+dp)>0?dp/(lp+dp)*100:null;
+        html += `<div class="mr"><span class="ml">Унікальних лайкерів</span><span class="mv drill-trigger" onclick="openDrill('Унікальних лайкерів','${lbl}', ${apps}, 'liking_users', {prevField:'liking_users_prevwk'})">${fmtBig(rs.likingUsers)} ${wowTxt(rs.likingUsersWow)}</span></div>
+          <div class="mr"><span class="ml">Likes на користувача</span><span class="mv drill-trigger" onclick="openDrill('Likes на користувача','${lbl}', ${apps}, r=>n(r.liking_users)>0?n(r.likes_total)/n(r.liking_users):0, {suffix:'×', prevField:r=>n(r.liking_users_prevwk)>0?n(r.likes_total_prevwk)/n(r.liking_users_prevwk):null})">${rs.likesPerUser.toFixed(1)}× ${wowTxt(rs.likesPerUserWow)}</span></div>
+          <div class="mr" title="Тільки на постах, не коментарях і тредах. Бенчмарк ~15-18%"><span class="ml">% дизлайків на постах</span><span class="mv" style="color:${share!=null&&share>18?'#f87171':'#fff'}">${share!=null?share.toFixed(1)+'%':'N/A'}</span></div>`;
       } else {
         html += '<div style="color:#6b7280;font-size:12px">Немає даних</div>';
+      }
+      const chatVal = r.chat_reactions==null ? 'N/A' : `👍 ${fmtBig(n(r.chat_likes))} · 👎 ${fmtBig(n(r.chat_dislikes))} ${wowTxt(r.chat_reactions_wow_pct)}`;
+      html += `<div class="mr" title="iOS з 30.09, Android з 26.10. Окремо, не входять у лайки й дизлайки вище"><span class="ml">Реакції в чатах</span><span class="mv${n(r.chat_reactions)>0?' drill-trigger':''}"${n(r.chat_reactions)>0?` onclick="openDrill('Реакції в чатах','${lbl}', ${apps}, 'chat_reactions', {wowField:'chat_reactions_wow_pct'})"`:''}>${chatVal}</span></div>`;
+      if(webReal){
+        const modLine=(title,likes,dislikes)=>`<div style="display:flex;justify-content:space-between;padding:3px 0;font-size:11px"><span style="color:#9ca3af">${title}</span><span style="font-family:monospace;color:#d1d5db"><span class="drill-trigger" onclick="openDrill('Likes модераторів: ${title}','${lbl}', ${apps}, '${likes}', {})">👍 ${fmtBig(n(r[likes]))}</span> · <span class="drill-trigger" onclick="openDrill('Dislikes модераторів: ${title}','${lbl}', ${apps}, '${dislikes}', {})">👎 ${fmtBig(n(r[dislikes]))}</span></span></div>`;
+        html += `<div style="margin-top:10px;padding-top:8px;border-top:1px dashed #374151">
+            <div style="font-size:11px;color:#9ca3af;margin-bottom:4px">Модератори (${fmtBig(n(r.mod_liking_users))} пристроїв), не входять у цифри вище</div>
+            <div style="padding:2px 0 4px;font-family:monospace;font-size:12px;color:#d1d5db"><span class="drill-trigger" onclick="openDrill('Likes модераторів','${lbl}', ${apps}, 'mod_likes_total', {wowField:'mod_likes_wow_pct'})">👍 ${fmtBig(n(r.mod_likes_total))} ${wowTxt(r.mod_likes_wow_pct)}</span> · <span class="drill-trigger" onclick="openDrill('Dislikes модераторів','${lbl}', ${apps}, 'mod_dislikes_total', {wowField:'mod_dislikes_wow_pct'})">👎 ${fmtBig(n(r.mod_dislikes_total))} ${wowTxt(r.mod_dislikes_wow_pct)}</span></div>
+            ${modLine('Пости','mod_likes_posts','mod_dislikes_posts')}${modLine('Коментарі','mod_likes_comments','mod_dislikes_comments')}${modLine('Треди','mod_likes_threads','mod_dislikes_threads')}
+          </div>`;
       }
       html += '</div>';
     });
     html += '</div>';
+    if(D.webRoles && D.webRoles.applied) html += '<div style="font-size:10px;color:#9ca3af;margin-bottom:12px">Web: лайки й дизлайки лише реальних користувачів, без акаунтів із роллю moderator_*. Ролі — поточний стан: колишні редактори у старих тижнях рахуються як реальні.</div>';
+    if(D.webRoles && !D.webRoles.applied) html += `<div style="font-size:10px;color:#fbbf24;margin-bottom:12px">Web: розділення на реальних користувачів і модераторів не застосовано, бо у файлі query 12302 бракує тижнів: ${D.webRoles.missingWeeks.join(', ')}. Web показано разом із модераторами.</div>`;
     // Row 1c: голосування по дименшнах — Content-опитування + Хто переможе? в одній картці на Clubs/Flagman/League/Web
     html += '<div class="g4">';
     function voteList(appsArr, dim, color, field, wowField, trendMap, limit){
@@ -2542,10 +2565,12 @@ function renderReport(D){
       const pollTrendMap = dim==='clubs'?D.react.clubPollTrends:dim==='flagman'?D.react.flagPollTrends:dim==='league'?D.react.leaguePollTrends:D.react.webPollTrends;
       const matchTrendMap = dim==='clubs'?D.react.clubMatchTrends:dim==='flagman'?D.react.flagMatchTrends:dim==='league'?D.react.leagueMatchTrends:D.react.webMatchTrends;
       html += `<div class="card"><div class="ct" style="color:${color}">${lbl}</div>`;
-      html += `<div style="font-size:10px;font-weight:600;color:#9ca3af;margin-bottom:4px">Content-опитування</div>`;
+      html += `<div class="drill-trigger" onclick="openDrill('Content-опитування','${lbl}', window.reportData.react.${appsKeyMap[dim]}, 'poll_votes', {wowField:'polls_wow_pct'})" style="display:flex;align-items:center;justify-content:space-between;gap:6px;margin:0 0 4px"><span style="font-size:10px;font-weight:600;color:#9ca3af">Content-опитування</span><span style="display:flex;align-items:center;gap:5px;flex-shrink:0"><span style="font-family:monospace;font-size:12px;font-weight:700;color:#fff">${fmtBig(n(D.react[dim]["poll_votes"]))}</span><span style="font-family:monospace;font-size:10px;color:${n(D.react[dim]["polls_wow_pct"])>=0?'#4ade80':'#f87171'}">${pct(n(D.react[dim]["polls_wow_pct"]))}</span>${sparkline(D.react.trends[dim+'_polls'],color,40,14,D.react.weeks)}</span></div>`;
       html += voteList(appsArr,dim,color,'poll_votes','polls_wow_pct',pollTrendMap,limit);
-      html += `<div style="font-size:10px;font-weight:600;color:#9ca3af;margin:10px 0 4px">Хто переможе? (матчі)</div>`;
+      html += `<div class="drill-trigger" onclick="openDrill('Хто переможе? (матчі)','${lbl}', window.reportData.react.${appsKeyMap[dim]}, 'match_votes', {wowField:'match_votes_wow_pct'})" style="display:flex;align-items:center;justify-content:space-between;gap:6px;margin:10px 0 4px"><span style="font-size:10px;font-weight:600;color:#9ca3af">Хто переможе? (матчі)</span><span style="display:flex;align-items:center;gap:5px;flex-shrink:0"><span style="font-family:monospace;font-size:12px;font-weight:700;color:#fff">${fmtBig(n(D.react[dim]["match_votes"]))}</span><span style="font-family:monospace;font-size:10px;color:${n(D.react[dim]["match_votes_wow_pct"])>=0?'#4ade80':'#f87171'}">${pct(n(D.react[dim]["match_votes_wow_pct"]))}</span>${sparkline(D.react.trends[dim+'_match'],color,40,14,D.react.weeks)}</span></div>`;
       html += voteList(appsArr,dim,color,'match_votes','match_votes_wow_pct',matchTrendMap,limit);
+      const voteRs=D.structural&&D.structural.reactionSplit&&D.structural.reactionSplit[dim];
+      if(voteRs&&voteRs.pollVoters>0) html += `<div class="mr" style="margin-top:8px"><span class="ml">Унікальних голосуючих</span><span class="mv drill-trigger" onclick="openDrill('Унікальних голосуючих','${lbl}', window.reportData.react.${appsKeyMap[dim]}, 'poll_voters', {prevField:'poll_voters_prevwk'})">${fmtBig(voteRs.pollVoters)}${voteRs.pollVotersWow!=null?` <span style="font-size:10px;font-weight:600;color:${voteRs.pollVotersWow>=0?'#4ade80':'#f87171'}">${pct(voteRs.pollVotersWow)}</span>`:''}</span></div>`;
       html += '</div>';
     });
     html += '</div>'; // end g4 (vote lists)
